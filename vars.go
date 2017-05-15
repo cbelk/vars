@@ -78,7 +78,6 @@ func ConnectDB(conf *VarsConfig) (*sql.DB, error) {
 func DecommissionSystem(db *sql.DB, name string) error {
     res, err := db.Exec(DecomSystem, name)
     if rows, _ := res.RowsAffected(); rows < 1 {
-//    if res == nil {
         return errors.New("vars: DecommissionSystem: No rows were updated")
     }
     return err
