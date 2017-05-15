@@ -8,11 +8,11 @@ import (
     "fmt"
     "os"
 
-    _ "github.com/lib/pq"
+    _ "github.com/lib/pq" // Postgresql driver
 )
 
 // Conf will hold the VARS configuration.
-var Conf VarsConfig
+var Conf Config
 
 // SQL queries to be used in program execution.
 const (
@@ -30,8 +30,8 @@ type System struct {
     Description string
 }
 
-// VarsConfig is the structure that holds the configuration options for VARS.
-type VarsConfig struct {
+// Config is the structure that holds the configuration options for VARS.
+type Config struct {
     Host string
     Port string
     User string
@@ -39,7 +39,7 @@ type VarsConfig struct {
     Name string
 }
 
-// ActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
+// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
 func GetActiveSystems(db *sql.DB) (*[]System, error) {
     systems := []System{}
     rows, err := db.Query(ActiveSystems)
@@ -70,7 +70,7 @@ func AddSystem(db *sql.DB, sys *System) error {
 }
 
 // ConnectDB establishes a connection to the Postgresql database and returns a pointer to the database handler, as well as any errors encountered.
-func ConnectDB(conf *VarsConfig) (*sql.DB, error) {
+func ConnectDB(conf *Config) (*sql.DB, error) {
     dbinfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", conf.Host, conf.Port, conf.User, conf.Pass, conf.Name)
     db, err := sql.Open("postgres", dbinfo)
     return db, err
@@ -85,7 +85,7 @@ func DecommissionSystem(db *sql.DB, name string) error {
     return err
 }
 
-// ReadConfig reads the configurations (specified in JSON format) into the Conf variable (type VarsConfig).
+// ReadConfig reads the configurations (specified in JSON format) into the Conf variable (type Config).
 func ReadConfig(config string) (err error) {
     file, err := os.Open(config)
     if err != nil {
