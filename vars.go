@@ -16,14 +16,16 @@ var Conf VarsConfig
 
 // SQL queries to be used in program execution.
 const (
-    ActiveSystems   string = "SELECT sysname, location, description FROM systems WHERE state='active';"
+    ActiveSystems   string = "SELECT sysname, systype, opsys, location, description FROM systems WHERE state='active';"
     DecomSystem     string = "UPDATE systems SET state='decommissioned' WHERE sysname=$1;"
-    InsertSystem    string = "INSERT INTO systems (sysname, location, description, state) VALUES ($1, $2, $3, $4);"
+    InsertSystem    string = "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);"
 )
 
 // System is the structure that holds information about systems in the environment.
 type System struct {
     Name        string
+    Type        string
+    OpSys       string
     Location    string
     Description string
 }
@@ -47,7 +49,7 @@ func GetActiveSystems(db *sql.DB) (*[]System, error) {
     defer rows.Close()
     for rows.Next() {
         var sys System
-        if err := rows.Scan(&sys.Name, &sys.Location, &sys.Description); err != nil {
+        if err := rows.Scan(&sys.Name, &sys.Type, &sys.OpSys, &sys.Location, &sys.Description); err != nil {
             return &systems, err
         }
         systems = append(systems, sys)
@@ -60,7 +62,7 @@ func GetActiveSystems(db *sql.DB) (*[]System, error) {
 
 // AddSystem inserts a new systems into the VARS database.
 func AddSystem(db *sql.DB, sys *System) error {
-    res, err := db.Exec(InsertSystem, sys.Name, sys.Location, sys.Description, "active")
+    res, err := db.Exec(InsertSystem, sys.Name, sys.Type, sys.OpSys, sys.Location, sys.Description, "active")
     if rows, _ := res.RowsAffected(); rows < 1 {
         return errors.New("vars: AddSystem: No rows were inserted")
     }

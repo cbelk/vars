@@ -153,6 +153,8 @@ ALTER TABLE ref OWNER TO vars;
 CREATE TABLE systems (
     sysid integer NOT NULL,
     sysname text NOT NULL,
+    systype text NOT NULL,
+    opsys text NOT NULL,
     description text NOT NULL,
     location text NOT NULL,
     state text NOT NULL
