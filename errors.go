@@ -22,6 +22,25 @@ var (
 	ErrGenericVars = errors.New("Something went wrong")
 )
 
+//Errs is a list of our errors making it easier to pass as a single paramenter and easier consumption
+type Errs []Err
+
+func (es Errs) Error() string {
+	var errStrings []string
+	for _, e := range es {
+		errStrings = append(errStrings, e.Error())
+	}
+	return strings.Join(errStrings, "\n")
+}
+
+func (es Errs) append(errT errType, parents ...string) {
+	es = append(es, newErr(errT, parents...))
+}
+
+func (es Errs) appendFromError(err error, parents ...string) {
+	es = append(es, newErrFromErr(err, parents...))
+}
+
 //Err is an error that occured inside the vars package
 type Err struct {
 	parents []string
