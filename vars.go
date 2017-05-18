@@ -155,6 +155,7 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		}
 		err = e
 	}
+	rollback = false
 	return tx.Commit()
 }
 
