@@ -1,1 +1,13 @@
+# Adding a generic ignore to exclude any files without an extension
+*
+!*/
+!*.*
+!Makefile
+!LICENSE
+# Ignore binary files
+*.exe
+# Ignore Mac DS_Store
+.DS_Store
 tmp/*
+vendor/*/
+
