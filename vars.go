@@ -20,6 +20,7 @@ type sqlStatement int
 const (
 	ssActiveSystems sqlStatement = iota
 	ssDecomSystem
+	ssGetVulnDates
 	ssInsertExploit
 	ssInsertRefers
 	ssInsertSystem
@@ -39,6 +40,7 @@ var (
 	queryStrings = map[sqlStatement]string{
 		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
+		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertRefers:    "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
@@ -81,6 +83,12 @@ type System struct {
 	State       string // Active or decommissioned
 }
 
+type VulnDates struct {
+	Published sql.NullString // Date the vulnerability was made public
+	Initiated string         // Date the vulnerability assessment was started
+	Mitigated sql.NullString // Date the vulnerability was mitigated on all systems
+}
+
 // Vulnerability holds information about a discovered vulnerability and the vulnerability assessment.
 type Vulnerability struct {
 	ID          int
@@ -94,9 +102,7 @@ type Vulnerability struct {
 	Summary     string
 	Test        string // Test to see if system has this vulnerability
 	Mitigation  string
-	Published   sql.NullString // Date the vulnerability was made public
-	Initiated   string         // Date the vulnerability assessment was started
-	Mitigated   sql.NullString // Date the vulnerability was mitigated on all systems
+	Dates       VulnDates      // The dates associated with the vulnerability
 	Tickets     []string       // Tickets relating to the vulnerability
 	References  []string       // Reference URLs
 	Exploit     sql.NullString // Exploit for the vulnerability
@@ -276,8 +282,8 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 
 // SetDates updates the dates published, initiated, and mitigated.
 func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
-	if vuln.Published.Valid {
-		res, err := tx.Stmt(queries[ssUpdatePubDate]).Exec(vuln.Published, vuln.ID)
+	if vuln.Dates.Published.Valid {
+		res, err := tx.Stmt(queries[ssUpdatePubDate]).Exec(vuln.Dates.Published, vuln.ID)
 		if err != nil {
 			return err
 		}
@@ -285,8 +291,8 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			return errors.New("vars: SetDates: Published: No rows were updated")
 		}
 	}
-	if vuln.Initiated != "" {
-		res, err := tx.Stmt(queries[ssUpdateInitDate]).Exec(vuln.Published, vuln.ID)
+	if vuln.Dates.Initiated != "" {
+		res, err := tx.Stmt(queries[ssUpdateInitDate]).Exec(vuln.Dates.Initiated, vuln.ID)
 		if err != nil {
 			return err
 		}
@@ -294,8 +300,8 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			return errors.New("vars: SetDates: Initiated: No rows were updated")
 		}
 	}
-	if vuln.Mitigated.Valid {
-		res, err := tx.Stmt(queries[ssUpdateMitDate]).Exec(vuln.Published, vuln.ID)
+	if vuln.Dates.Mitigated.Valid {
+		res, err := tx.Stmt(queries[ssUpdateMitDate]).Exec(vuln.Dates.Mitigated, vuln.ID)
 		if err != nil {
 			return err
 		}
@@ -353,4 +359,18 @@ func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 		}
 	}
 	return err
+}
+
+// IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
+// false otherwise.
+func IsVulnOpen(db *sql.DB, vid int) (bool, error) {
+	var vd VulnDates
+	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd)
+	if err != nil {
+		return false, err
+	}
+	if vd.Mitigated.Valid {
+		return false, nil
+	}
+	return true, nil
 }
