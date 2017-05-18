@@ -85,22 +85,22 @@ type System struct {
 type Vulnerability struct {
 	ID          int
 	Name        string
-	Cve         string
-	Cvss        float32 // CVSS score
-	CorpScore   float32 // Calculated corporate score
-	CvssLink    string  // Link to CVSS scoresheet
-	Finder      int     // Employee that found the vulnerability
-	Initiator   int     // Employee that started the vulnerability assessment
+	Cve         sql.NullString
+	Cvss        float32        // CVSS score
+	CorpScore   float32        // Calculated corporate score
+	CvssLink    sql.NullString // Link to CVSS scoresheet
+	Finder      int            // Employee that found the vulnerability
+	Initiator   int            // Employee that started the vulnerability assessment
 	Summary     string
 	Test        string // Test to see if system has this vulnerability
 	Mitigation  string
-	Published   string   // Date the vulnerability was made public
-	Initiated   string   // Date the vulnerability assessment was started
-	Mitigated   string   // Date the vulnerability was mitigated on all systems
-	Tickets     []string // Tickets relating to the vulnerability
-	References  []string // Reference URLs
-	Exploit     string   // Exploit for the vulnerability
-	Exploitable bool     // Are there currently exploits for the vulnerability
+	Published   sql.NullString // Date the vulnerability was made public
+	Initiated   string         // Date the vulnerability assessment was started
+	Mitigated   sql.NullString // Date the vulnerability was mitigated on all systems
+	Tickets     []string       // Tickets relating to the vulnerability
+	References  []string       // Reference URLs
+	Exploit     sql.NullString // Exploit for the vulnerability
+	Exploitable sql.NullBool   // Are there currently exploits for the vulnerability
 }
 
 // AddSystem inserts a new systems into the VARS database.
@@ -253,7 +253,7 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 			return errors.New("vars: SetCvss: Cvss: No rows were updated")
 		}
 	}
-	if vuln.CvssLink != "" {
+	if vuln.CvssLink.Valid {
 		res, err := tx.Stmt(queries[ssUpdateCvssLink]).Exec(vuln.CvssLink, vuln.ID)
 		if err != nil {
 			return err
@@ -276,7 +276,7 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 
 // SetDates updates the dates published, initiated, and mitigated.
 func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
-	if vuln.Published != "" {
+	if vuln.Published.Valid {
 		res, err := tx.Stmt(queries[ssUpdatePubDate]).Exec(vuln.Published, vuln.ID)
 		if err != nil {
 			return err
@@ -294,7 +294,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			return errors.New("vars: SetDates: Initiated: No rows were updated")
 		}
 	}
-	if vuln.Mitigated != "" {
+	if vuln.Mitigated.Valid {
 		res, err := tx.Stmt(queries[ssUpdateMitDate]).Exec(vuln.Published, vuln.ID)
 		if err != nil {
 			return err
@@ -309,7 +309,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 // SetExploits inserts an entry into the exploits table if the exploit string isn't zero valued.
 func SetExploits(tx *sql.Tx, vuln *Vulnerability) error {
 	var err error
-	if vuln.Exploit != "" {
+	if vuln.Exploit.Valid {
 		res, err := tx.Stmt(queries[ssInsertExploit]).Exec(vuln.ID, true, vuln.Exploit)
 		if err != nil {
 			return err
