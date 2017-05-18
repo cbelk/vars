@@ -365,7 +365,7 @@ func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 // false otherwise.
 func IsVulnOpen(db *sql.DB, vid int) (bool, error) {
 	var vd VulnDates
-	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd)
+	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
 	if err != nil {
 		return false, err
 	}
