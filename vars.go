@@ -3,15 +3,9 @@ package vars
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
-	"os"
 
 	_ "github.com/lib/pq" // Postgresql driver
 )
-
-// Conf will hold the VARS configuration.
-var Conf Config
 
 type sqlStatement int
 
@@ -52,15 +46,6 @@ var (
 		ssUpdatePubDate:   "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 	}
 )
-
-// Config holds the configuration options for VARS.
-type Config struct {
-	Host string
-	Port string
-	User string
-	Pass string
-	Name string
-}
 
 // Employee holds information about an employee
 type Employee struct {
@@ -167,48 +152,6 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 	return errs
 }
 
-// ConnectDB establishes a connection to the Postgresql database and returns a pointer to the database handler, as well as any errors encountered.
-func ConnectDB(conf *Config) (*sql.DB, error) {
-	dbinfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", conf.Host, conf.Port, conf.User, conf.Pass, conf.Name)
-	db, err := sql.Open("postgres", dbinfo)
-	if err != nil {
-		return nil, err
-	}
-	if err = prepareStatements(db); err != nil {
-		return nil, err
-	}
-	return db, nil
-}
-
-//CloseDB is a way to close connections to the database safely
-func CloseDB(db *sql.DB) {
-	closeStatements()
-	db.Close()
-}
-
-func closeStatements() {
-	if queries == nil {
-		return
-	}
-	for _, stmt := range queries {
-		stmt.Close()
-	}
-}
-
-func prepareStatements(db *sql.DB) error {
-	if queries == nil {
-		queries = make(map[sqlStatement]*sql.Stmt)
-	}
-	for name, ss := range queryStrings {
-		stmt, err := db.Prepare(ss)
-		if err != nil {
-			return err
-		}
-		queries[name] = stmt
-	}
-	return nil
-}
-
 // DecommissionSystem updates the system table to reflect a decommissioned system.
 func DecommissionSystem(db *sql.DB, name string) error {
 	res, err := queries[ssDecomSystem].Exec(name)
@@ -237,16 +180,6 @@ func GetActiveSystems(db *sql.DB) (*[]System, error) {
 		return &systems, err
 	}
 	return &systems, nil
-}
-
-// ReadConfig reads the configurations (specified in JSON format) into the Conf variable (type Config).
-func ReadConfig(config string) (err error) {
-	file, err := os.Open(config)
-	if err != nil {
-		return
-	}
-	err = json.NewDecoder(file).Decode(&Conf)
-	return
 }
 
 // SetCvss updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
