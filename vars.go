@@ -4,10 +4,8 @@ package vars
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	_ "github.com/lib/pq" // Postgresql driver
 )
@@ -113,13 +111,14 @@ type Vulnerability struct {
 func AddSystem(db *sql.DB, sys *System) error {
 	res, err := queries[ssInsertSystem].Exec(sys.Name, sys.Type, sys.OpSys, sys.Location, sys.Description, "active")
 	if rows, _ := res.RowsAffected(); rows < 1 {
-		return errors.New("vars: AddSystem: No rows were inserted")
+		return newErr(noRowsInserted, "AddSystem")
 	}
 	return err
 }
 
 // AddVulnerability starts a new vulnerability assessment by inserting a new vulnerability.
 func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
+	var errs Errs
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -135,34 +134,37 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		return err
 	}
 	if rows, _ := res.RowsAffected(); rows < 1 {
-		err = errors.New("vars: AddVulnerability: No rows were inserted")
+		errs.append(noRowsInserted, "AddVulnerability")
 	}
 	if e := SetCvss(tx, vuln); e != nil {
-		if !strings.Contains(e.Error(), "No rows were") {
+		if !IsNoRowsError(e) {
 			return e
 		}
-		err = e
+		errs.appendFromError(e, "AddVulnerability")
 	}
 	if e := SetDates(tx, vuln); e != nil {
-		if !strings.Contains(e.Error(), "No rows were") {
+		if !IsNoRowsError(e) {
 			return e
 		}
-		err = e
+		errs.appendFromError(e, "AddVulnerability")
 	}
 	if e := SetTickets(tx, vuln); e != nil {
-		if !strings.Contains(e.Error(), "No rows were") {
+		if !IsNoRowsError(e) {
 			return e
 		}
-		err = e
+		errs.appendFromError(e, "AddVulnerability")
 	}
 	if e := SetReferences(tx, vuln); e != nil {
-		if !strings.Contains(e.Error(), "No rows were") {
+		if !IsNoRowsError(e) {
 			return e
 		}
-		err = e
+		errs.appendFromError(e, "AddVulnerability")
 	}
 	rollback = false
-	return tx.Commit()
+	if e := tx.Commit(); e != nil {
+		errs.appendFromError(e, "AddVulnerability")
+	}
+	return errs
 }
 
 // ConnectDB establishes a connection to the Postgresql database and returns a pointer to the database handler, as well as any errors encountered.
@@ -197,8 +199,8 @@ func prepareStatements(db *sql.DB) error {
 	if queries == nil {
 		queries = make(map[sqlStatement]*sql.Stmt)
 	}
-	for name, sql := range queryStrings {
-		stmt, err := db.Prepare(sql)
+	for name, ss := range queryStrings {
+		stmt, err := db.Prepare(ss)
 		if err != nil {
 			return err
 		}
@@ -211,7 +213,7 @@ func prepareStatements(db *sql.DB) error {
 func DecommissionSystem(db *sql.DB, name string) error {
 	res, err := queries[ssDecomSystem].Exec(name)
 	if rows, _ := res.RowsAffected(); rows < 1 {
-		return errors.New("vars: DecommissionSystem: No rows were updated")
+		return newErr(noRowsUpdated, "DecommissionSystem")
 	}
 	return err
 }
@@ -250,13 +252,14 @@ func ReadConfig(config string) (err error) {
 // SetCvss updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
 // It will not do a partial update as in if something fails, the transaction is rolled back.
 func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
+	var errs Errs
 	if vuln.Cvss != 0 {
 		res, err := tx.Stmt(queries[ssUpdateCvss]).Exec(vuln.Cvss, vuln.ID)
 		if err != nil {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetCvss: Cvss: No rows were updated")
+			errs.append(noRowsUpdated, "SetCvss", "Cvss")
 		}
 	}
 	if vuln.CvssLink.Valid {
@@ -265,7 +268,7 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetCvss: CvssLink: No rows were updated")
+			errs.append(noRowsUpdated, "SetCvss", "CvssLink")
 		}
 	}
 	if vuln.CorpScore != 0 {
@@ -274,21 +277,22 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetCvss: CorpScore: No rows were updated")
+			errs.append(noRowsUpdated, "SetCvss", "CorpScore")
 		}
 	}
-	return nil
+	return errs
 }
 
 // SetDates updates the dates published, initiated, and mitigated.
 func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
+	var errs Errs
 	if vuln.Dates.Published.Valid {
 		res, err := tx.Stmt(queries[ssUpdatePubDate]).Exec(vuln.Dates.Published, vuln.ID)
 		if err != nil {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetDates: Published: No rows were updated")
+			errs.append(noRowsUpdated, "SetDates", "Published")
 		}
 	}
 	if vuln.Dates.Initiated != "" {
@@ -297,7 +301,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetDates: Initiated: No rows were updated")
+			errs.append(noRowsUpdated, "SetDates", "Initiated")
 		}
 	}
 	if vuln.Dates.Mitigated.Valid {
@@ -306,22 +310,22 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			return errors.New("vars: SetDates: Mitigated: No rows were updated")
+			errs.append(noRowsUpdated, "SetDates", "Mitigated")
 		}
 	}
-	return nil
+	return errs
 }
 
 // SetExploits inserts an entry into the exploits table if the exploit string isn't zero valued.
 func SetExploits(tx *sql.Tx, vuln *Vulnerability) error {
-	var err error
+	var err Err
 	if vuln.Exploit.Valid {
 		res, err := tx.Stmt(queries[ssInsertExploit]).Exec(vuln.ID, true, vuln.Exploit)
 		if err != nil {
 			return err
 		}
 		if rows, _ := res.RowsAffected(); rows < 1 {
-			err = errors.New("vars: SetExploits: No rows were inserted")
+			err = newErr(noRowsInserted, "SetExploits")
 		}
 	}
 	return err
@@ -329,36 +333,36 @@ func SetExploits(tx *sql.Tx, vuln *Vulnerability) error {
 
 // SetTickets inserts entries into the tickets table for all ticket ID's in the slice.
 func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
-	var err error
+	var errs Errs
 	if len(vuln.Tickets) > 0 {
 		for _, t := range vuln.Tickets {
-			res, err := tx.Stmt(queries[ssInsertTicket]).Exec(vuln.ID, t)
-			if err != nil {
-				return err
+			res, e := tx.Stmt(queries[ssInsertTicket]).Exec(vuln.ID, t)
+			if e != nil {
+				return e
 			}
 			if rows, _ := res.RowsAffected(); rows < 1 {
-				err = errors.New("vars: SetTickets: No rows were inserted")
+				errs.append(noRowsInserted, "SetTickets")
 			}
 		}
 	}
-	return err
+	return errs
 }
 
 // SetReferences inserts entries into the ref table for all URLs in the slice.
 func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
-	var err error
+	var errs Errs
 	if len(vuln.References) > 0 {
 		for _, r := range vuln.References {
-			res, err := tx.Stmt(queries[ssInsertRefers]).Exec(vuln.ID, r)
-			if err != nil {
-				return err
+			res, e := tx.Stmt(queries[ssInsertRefers]).Exec(vuln.ID, r)
+			if e != nil {
+				return e
 			}
 			if rows, _ := res.RowsAffected(); rows < 1 {
-				err = errors.New("vars: SetReferences: No rows were inserted")
+				errs.append(noRowsInserted, "SetReferences")
 			}
 		}
 	}
-	return err
+	return errs
 }
 
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
