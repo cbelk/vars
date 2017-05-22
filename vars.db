@@ -126,9 +126,9 @@ ALTER TABLE exploits OWNER TO vars;
 
 CREATE TABLE impact (
     vulnid integer NOT NULL,
-    cvss integer NOT NULL,
+    cvss decimal NOT NULL,
     cvsslink text,
-    corpscore integer NOT NULL
+    corpscore decimal NOT NULL
 );
 
 

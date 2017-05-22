@@ -18,6 +18,7 @@ const (
 	ssInsertSystem
 	ssInsertTicket
 	ssInsertVuln
+	ssUpdateCve
 	ssUpdateCvss
 	ssUpdateCvssLink
 	ssUpdateCorpScore
@@ -38,6 +39,7 @@ var (
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
 		ssInsertTicket:    "INSERT INTO tickets (vulnid, ticket) VALUES ($1, $2);",
 		ssInsertVuln:      "INSERT INTO vuln (vulnname, cve, finder, initiator, summary, test, mitigation) VALUES ($1, $2, $3, $4, $5, $6, $7);",
+		ssUpdateCve:       "UPDATE vuln SET cve=$1 WHERE vulnid=$2;",
 		ssUpdateCvss:      "UPDATE impact SET cvss=$1 WHERE vulnid=$2;",
 		ssUpdateCvssLink:  "UPDATE impact SET cvsslink=$1 WHERE vulnid=$2;",
 		ssUpdateCorpScore: "UPDATE impact SET corpscore=$1 WHERE vulnid=$2;",
@@ -121,30 +123,52 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 	if rows, _ := res.RowsAffected(); rows < 1 {
 		errs.append(noRowsInserted, "AddVulnerability")
 	}
-	if e := SetCvss(tx, vuln); e != nil {
-		if !IsNoRowsError(e) {
-			return e
+
+	var e interface{}
+	// Setting values in the impact table
+	e = SetImpact(tx, vuln)
+	if ve, ok := e.(Err); ok {
+		if !ve.IsNoRowsError() {
+			return ve
 		}
-		errs.appendFromError(e, "AddVulnerability")
+		errs.appendFromError(ve, "AddVulnerability")
+	} else if ves, ok := e.(Errs); ok {
+		errs.appendFromErrs(ves)
 	}
-	if e := SetDates(tx, vuln); e != nil {
-		if !IsNoRowsError(e) {
-			return e
+
+	// Setting values in the dates table
+	e = SetDates(tx, vuln)
+	if ve, ok := e.(Err); ok {
+		if !ve.IsNoRowsError() {
+			return ve
 		}
-		errs.appendFromError(e, "AddVulnerability")
+		errs.appendFromError(ve, "AddVulnerability")
+	} else if ves, ok := e.(Errs); ok {
+		errs.appendFromErrs(ves)
 	}
-	if e := SetTickets(tx, vuln); e != nil {
-		if !IsNoRowsError(e) {
-			return e
+
+	// Setting values in the tickets table
+	e = SetTickets(tx, vuln)
+	if ve, ok := e.(Err); ok {
+		if !ve.IsNoRowsError() {
+			return ve
 		}
-		errs.appendFromError(e, "AddVulnerability")
+		errs.appendFromError(ve, "AddVulnerability")
+	} else if ves, ok := e.(Errs); ok {
+		errs.appendFromErrs(ves)
 	}
-	if e := SetReferences(tx, vuln); e != nil {
-		if !IsNoRowsError(e) {
-			return e
+
+	// Setting values in the ref table
+	e = SetReferences(tx, vuln)
+	if ve, ok := e.(Err); ok {
+		if !ve.IsNoRowsError() {
+			return ve
 		}
-		errs.appendFromError(e, "AddVulnerability")
+		errs.appendFromError(ve, "AddVulnerability")
+	} else if ves, ok := e.(Errs); ok {
+		errs.appendFromErrs(ves)
 	}
+
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		errs.appendFromError(e, "AddVulnerability")
@@ -182,35 +206,35 @@ func GetActiveSystems(db *sql.DB) (*[]System, error) {
 	return &systems, nil
 }
 
-// SetCvss updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
+// SetImpact updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
 // It will not do a partial update as in if something fails, the transaction is rolled back.
-func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
+func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 	if vuln.Cvss != 0 {
-		res, err := tx.Stmt(queries[ssUpdateCvss]).Exec(vuln.Cvss, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetCvss", "Cvss")
+		err := UpdateCvss(tx, vuln.ID, vuln.Cvss)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	if vuln.CvssLink.Valid {
-		res, err := tx.Stmt(queries[ssUpdateCvssLink]).Exec(vuln.CvssLink, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetCvss", "CvssLink")
+		err := UpdateCvssLink(tx, vuln.ID, vuln.CvssLink.String)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	if vuln.CorpScore != 0 {
-		res, err := tx.Stmt(queries[ssUpdateCorpScore]).Exec(vuln.CorpScore, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetCvss", "CorpScore")
+		err := UpdateCorpScore(tx, vuln.ID, vuln.CorpScore)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	return errs
@@ -220,65 +244,42 @@ func SetCvss(tx *sql.Tx, vuln *Vulnerability) error {
 func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 	if vuln.Dates.Published.Valid {
-		res, err := tx.Stmt(queries[ssUpdatePubDate]).Exec(vuln.Dates.Published, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetDates", "Published")
+		err := UpdatePubDate(tx, vuln.ID, vuln.Dates.Published.String)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	if vuln.Dates.Initiated != "" {
-		res, err := tx.Stmt(queries[ssUpdateInitDate]).Exec(vuln.Dates.Initiated, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetDates", "Initiated")
+		err := UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	if vuln.Dates.Mitigated.Valid {
-		res, err := tx.Stmt(queries[ssUpdateMitDate]).Exec(vuln.Dates.Mitigated, vuln.ID)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			errs.append(noRowsUpdated, "SetDates", "Mitigated")
+		err := UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated.String)
+		if err.err != nil {
+			if !err.IsNoRowsError() {
+				return err
+			}
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	return errs
 }
 
-// SetExploits inserts an entry into the exploits table if the exploit string isn't zero valued.
-func SetExploits(tx *sql.Tx, vuln *Vulnerability) error {
+// SetExploit inserts an entry into the exploits table if the exploit string isn't zero valued.
+func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
 	var err Err
 	if vuln.Exploit.Valid {
-		res, err := tx.Stmt(queries[ssInsertExploit]).Exec(vuln.ID, true, vuln.Exploit)
-		if err != nil {
-			return err
-		}
-		if rows, _ := res.RowsAffected(); rows < 1 {
-			err = newErr(noRowsInserted, "SetExploits")
-		}
+		err = InsertExploit(tx, vuln.ID, vuln.Exploit.String)
 	}
 	return err
-}
-
-// SetTickets inserts entries into the tickets table for all ticket ID's in the slice.
-func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
-	var errs Errs
-	if len(vuln.Tickets) > 0 {
-		for _, t := range vuln.Tickets {
-			res, e := tx.Stmt(queries[ssInsertTicket]).Exec(vuln.ID, t)
-			if e != nil {
-				return e
-			}
-			if rows, _ := res.RowsAffected(); rows < 1 {
-				errs.append(noRowsInserted, "SetTickets")
-			}
-		}
-	}
-	return errs
 }
 
 // SetReferences inserts entries into the ref table for all URLs in the slice.
@@ -286,16 +287,72 @@ func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 	if len(vuln.References) > 0 {
 		for _, r := range vuln.References {
-			res, e := tx.Stmt(queries[ssInsertRefers]).Exec(vuln.ID, r)
-			if e != nil {
-				return e
-			}
-			if rows, _ := res.RowsAffected(); rows < 1 {
-				errs.append(noRowsInserted, "SetReferences")
+			err := InsertRef(tx, vuln.ID, r)
+			if err.err != nil {
+				if !err.IsNoRowsError() {
+					return err
+				}
+				errs.appendFromError(err, "SetReferences")
 			}
 		}
 	}
 	return errs
+}
+
+// SetTickets inserts entries into the tickets table for all ticket ID's in the slice.
+func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
+	var errs Errs
+	if len(vuln.Tickets) > 0 {
+		for _, t := range vuln.Tickets {
+			err := InsertTicket(tx, vuln.ID, t)
+			if err.err != nil {
+				if !err.IsNoRowsError() {
+					return err
+				}
+				errs.appendFromError(err, "SetTickets")
+			}
+		}
+	}
+	return errs
+}
+
+// InsertExploit will update the ref table with the given url and vulnerability ID.
+func InsertExploit(tx *sql.Tx, vid int, exp string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssInsertExploit]).Exec(vid, true, exp)
+	if e != nil {
+		return newErrFromErr(e, "InsertExploit")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "InsertExploit")
+	}
+	return err
+}
+
+// InsertRef will update the ref table with the given url and vulnerability ID.
+func InsertRef(tx *sql.Tx, vid int, url string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssInsertRefers]).Exec(vid, url)
+	if e != nil {
+		return newErrFromErr(e, "InsertRef")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "InsertRef")
+	}
+	return err
+}
+
+// InsertTicket will update the tickets table with the given ticket and vulnerability ID.
+func InsertTicket(tx *sql.Tx, vid int, tick string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssInsertTicket]).Exec(vid, tick)
+	if e != nil {
+		return newErrFromErr(e, "InsertTicket")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "InsertTicket")
+	}
+	return err
 }
 
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
@@ -310,4 +367,95 @@ func IsVulnOpen(db *sql.DB, vid int) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// UpdateCve will update the CVE for the given vulnerability ID.
+func UpdateCve(tx *sql.Tx, vid int, cve string) error {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateCve]).Exec(cve, vid)
+	if e != nil {
+		return e
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateCve")
+	}
+	return err
+}
+
+// UpdateCvss will update the CVSS score for the given vulnerability ID.
+func UpdateCvss(tx *sql.Tx, vid int, cvss float32) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateCvss]).Exec(cvss, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdateCvss")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateCvss")
+	}
+	return err
+}
+
+// UpdateCvssLink will update the link to the CVSS score for the given vulnerability ID.
+func UpdateCvssLink(tx *sql.Tx, vid int, cvssLink string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateCvssLink]).Exec(cvssLink, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdateCvssLink")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateCvssLink")
+	}
+	return err
+}
+
+// UpdateCorpScore will update the corporate score for the given vulnerability ID.
+func UpdateCorpScore(tx *sql.Tx, vid int, cscore float32) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateCorpScore]).Exec(cscore, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdateCorpScore")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateCorpScore")
+	}
+	return err
+}
+
+// UpdateInitDate will update the date that the vulnerability assessment was initiated for the given vulnerability ID.
+func UpdateInitDate(tx *sql.Tx, vid int, initDate string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateInitDate]).Exec(initDate, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdateInitDate")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateInitDate")
+	}
+	return err
+}
+
+// UpdateMitDate will update the date that the vulnerability assessment was mitigated for the given vulnerability ID.
+func UpdateMitDate(tx *sql.Tx, vid int, mitDate string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdateMitDate]).Exec(mitDate, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdateMitDate")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdateMitDate")
+	}
+	return err
+}
+
+// UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.
+func UpdatePubDate(tx *sql.Tx, vid int, pubDate string) Err {
+	var err Err
+	res, e := tx.Stmt(queries[ssUpdatePubDate]).Exec(pubDate, vid)
+	if e != nil {
+		return newErrFromErr(e, "UpdatePubDate")
+	}
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		err = newErr(noRowsUpdated, "UpdatePubDate")
+	}
+	return err
 }
