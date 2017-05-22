@@ -131,7 +131,7 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		if !ve.IsNoRowsError() {
 			return ve
 		}
-		errs.appendFromError(ve.err, append([]string{"AddVulnerability"}, ve.parents...)...)
+		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
 		errs.appendFromErrs(ves)
 	}
@@ -142,7 +142,7 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		if !ve.IsNoRowsError() {
 			return ve
 		}
-		errs.appendFromError(ve.err, append([]string{"AddVulnerability"}, ve.parents...)...)
+		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
 		errs.appendFromErrs(ves)
 	}
@@ -153,7 +153,7 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		if !ve.IsNoRowsError() {
 			return ve
 		}
-		errs.appendFromError(ve.err, append([]string{"AddVulnerability"}, ve.parents...)...)
+		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
 		errs.appendFromErrs(ves)
 	}
@@ -164,7 +164,7 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		if !ve.IsNoRowsError() {
 			return ve
 		}
-		errs.appendFromError(ve.err, append([]string{"AddVulnerability"}, ve.parents...)...)
+		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
 		errs.appendFromErrs(ves)
 	}
@@ -216,7 +216,7 @@ func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetImpact"}, err.parents...)...)
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	if vuln.CvssLink.Valid {
@@ -225,7 +225,7 @@ func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetImpact"}, err.parents...)...)
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	if vuln.CorpScore != 0 {
@@ -234,7 +234,7 @@ func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetImpact"}, err.parents...)...)
+			errs.appendFromError(err, "SetImpact")
 		}
 	}
 	return errs
@@ -249,7 +249,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetDates"}, err.parents...)...)
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	if vuln.Dates.Initiated != "" {
@@ -258,7 +258,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetDates"}, err.parents...)...)
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	if vuln.Dates.Mitigated.Valid {
@@ -267,7 +267,7 @@ func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
 			if !err.IsNoRowsError() {
 				return err
 			}
-			errs.appendFromError(err.err, append([]string{"SetDates"}, err.parents...)...)
+			errs.appendFromError(err, "SetDates")
 		}
 	}
 	return errs
@@ -292,7 +292,7 @@ func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 				if !err.IsNoRowsError() {
 					return err
 				}
-				errs.appendFromError(err.err, append([]string{"SetReferences"}, err.parents...)...)
+				errs.appendFromError(err, "SetReferences")
 			}
 		}
 	}
@@ -309,7 +309,7 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 				if !err.IsNoRowsError() {
 					return err
 				}
-				errs.appendFromError(err.err, append([]string{"SetTickets"}, err.parents...)...)
+				errs.appendFromError(err, "SetTickets")
 			}
 		}
 	}
