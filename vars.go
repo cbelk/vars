@@ -14,6 +14,7 @@ const (
 	ssDecomSystem
 	ssGetVulnDates
 	ssInsertAffected
+	ssInsertEmployee
 	ssInsertExploit
 	ssInsertRefers
 	ssInsertSystem
@@ -40,6 +41,7 @@ var (
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
+		ssInsertEmployee:  "INSERT INTO employee (firstname, lastname, email) VALUES ($1, $2, $3);",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertRefers:    "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
@@ -127,6 +129,15 @@ func AddSystem(db *sql.DB, sys *System) error {
 	res, err := queries[ssInsertSystem].Exec(sys.Name, sys.Type, sys.OpSys, sys.Location, sys.Description, "active")
 	if rows, _ := res.RowsAffected(); rows < 1 {
 		return newErr(noRowsInserted, "AddSystem")
+	}
+	return err
+}
+
+// AddEmployee inserts a new employee into the VARS database.
+func AddEmployee(db *sql.DB, emp *Employee) error {
+	res, err := queries[ssInsertEmployee].Exec(emp.FirstName, emp.LastName, emp.Email)
+	if rows, _ := res.RowsAffected(); rows < 1 {
+		return newErr(noRowsInserted, "AddEmployee")
 	}
 	return err
 }
