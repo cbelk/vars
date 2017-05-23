@@ -41,7 +41,7 @@ var (
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
-		ssInsertEmployee:  "INSERT INTO employee (firstname, lastname, email) VALUES ($1, $2, $3);",
+		ssInsertEmployee:  "INSERT INTO emp (firstname, lastname, email) VALUES ($1, $2, $3);",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertRefers:    "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
@@ -57,7 +57,7 @@ var (
 		ssUpdateMitDate:   "UPDATE dates SET mitigated=$1 WHERE vulnid=$2;",
 		ssUpdatePubDate:   "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 		ssUpdateRefers:    "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
-		ssUpdateTicket:    "UPDATE ticket SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
+		ssUpdateTicket:    "UPDATE tickets SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
 	}
 	execNames = map[sqlStatement]string{
 		ssInsertAffected:  "InsertAffected",
