@@ -190,7 +190,7 @@ ALTER SEQUENCE systems_sysid_seq OWNED BY systems.sysid;
 
 CREATE TABLE tickets (
     vulnid integer NOT NULL,
-    ticket integer NOT NULL
+    ticket text NOT NULL
 );
 
 
