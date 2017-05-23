@@ -10,4 +10,5 @@
 .DS_Store
 tmp/*
 vendor/*/
-
+# Ignore swap files
+*.swp
