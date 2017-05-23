@@ -13,18 +13,23 @@ const (
 	ssActiveSystems sqlStatement = iota
 	ssDecomSystem
 	ssGetVulnDates
+	ssInsertAffected
 	ssInsertExploit
 	ssInsertRefers
 	ssInsertSystem
 	ssInsertTicket
 	ssInsertVuln
+	ssUpdateAffected
 	ssUpdateCve
 	ssUpdateCvss
 	ssUpdateCvssLink
 	ssUpdateCorpScore
+	ssUpdateExploit
 	ssUpdateInitDate
 	ssUpdateMitDate
 	ssUpdatePubDate
+	ssUpdateRefers
+	ssUpdateTicket
 )
 
 // SQL queries to be used in program execution.
@@ -34,30 +39,40 @@ var (
 		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
+		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertRefers:    "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
 		ssInsertTicket:    "INSERT INTO tickets (vulnid, ticket) VALUES ($1, $2);",
 		ssInsertVuln:      "INSERT INTO vuln (vulnname, cve, finder, initiator, summary, test, mitigation) VALUES ($1, $2, $3, $4, $5, $6, $7);",
+		ssUpdateAffected:  "UPDATE affected SET sysid=$1 WHERE vulnid=$2 AND sysid=$3;",
 		ssUpdateCve:       "UPDATE vuln SET cve=$1 WHERE vulnid=$2;",
 		ssUpdateCvss:      "UPDATE impact SET cvss=$1 WHERE vulnid=$2;",
 		ssUpdateCvssLink:  "UPDATE impact SET cvsslink=$1 WHERE vulnid=$2;",
 		ssUpdateCorpScore: "UPDATE impact SET corpscore=$1 WHERE vulnid=$2;",
+		ssUpdateExploit:   "UPDATE exploits SET exploitable=$1, exploit=$2 WHERE vulnid=$3;",
 		ssUpdateInitDate:  "UPDATE dates SET initiated=$1 WHERE vulnid=$2;",
 		ssUpdateMitDate:   "UPDATE dates SET mitigated=$1 WHERE vulnid=$2;",
 		ssUpdatePubDate:   "UPDATE dates SET published=$1 WHERE vulnid=$2;",
+		ssUpdateRefers:    "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
+		ssUpdateTicket:    "UPDATE ticket SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
 	}
 	execNames = map[sqlStatement]string{
+		ssInsertAffected:  "InsertAffected",
 		ssInsertExploit:   "InsertExploit",
 		ssInsertRefers:    "InsertRef",
 		ssInsertTicket:    "InsertTicket",
+		ssUpdateAffected:  "UpdateAffected",
 		ssUpdateCve:       "UpdateCve",
 		ssUpdateCvss:      "UpdateCvss",
 		ssUpdateCvssLink:  "UpdateCvssLink",
 		ssUpdateCorpScore: "UpdateCorpScore",
+		ssUpdateExploit:   "UpdateExploit",
 		ssUpdateInitDate:  "UpdateInitDate",
 		ssUpdateMitDate:   "UpdateMitDate",
 		ssUpdatePubDate:   "UpdatePubDate",
+		ssUpdateRefers:    "UpdateRefers",
+		ssUpdateTicket:    "UpdateTicket",
 	}
 )
 
@@ -219,6 +234,35 @@ func GetActiveSystems(db *sql.DB) (*[]System, error) {
 	return &systems, nil
 }
 
+// InsertAffected will insert a new row into the affected table with key (vid, sid).
+func InsertAffected(tx *sql.Tx, vid int, sid int) Err {
+	return execUpdates(tx, ssInsertAffected, vid, sid)
+}
+
+// InsertRef will insert a new row into the ref table with key (vid, url).
+func InsertRef(tx *sql.Tx, vid int, url string) Err {
+	return execUpdates(tx, ssInsertRefers, vid, url)
+}
+
+// InsertTicket will insert a new row into the ticket table with key (vid, ticket).
+func InsertTicket(tx *sql.Tx, vid int, ticket string) Err {
+	return execUpdates(tx, ssInsertTicket, vid, ticket)
+}
+
+// IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
+// false otherwise.
+func IsVulnOpen(db *sql.DB, vid int) (bool, error) {
+	var vd VulnDates
+	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
+	if err != nil {
+		return false, err
+	}
+	if vd.Mitigated.Valid {
+		return false, nil
+	}
+	return true, nil
+}
+
 // SetImpact updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
 // It will not do a partial update as in if something fails, the transaction is rolled back.
 func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
@@ -300,7 +344,7 @@ func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 	if len(vuln.References) > 0 {
 		for _, r := range vuln.References {
-			err := execUpdates(tx, ssInsertRefers, vuln.ID, r)
+			err := InsertRef(tx, vuln.ID, r)
 			if err.err != nil {
 				if !err.IsNoRowsError() {
 					return err
@@ -317,7 +361,7 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 	if len(vuln.Tickets) > 0 {
 		for _, t := range vuln.Tickets {
-			err := execUpdates(tx, ssInsertTicket, vuln.ID, t)
+			err := InsertTicket(tx, vuln.ID, t)
 			if err.err != nil {
 				if !err.IsNoRowsError() {
 					return err
@@ -329,22 +373,13 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 	return errs
 }
 
-// IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
-// false otherwise.
-func IsVulnOpen(db *sql.DB, vid int) (bool, error) {
-	var vd VulnDates
-	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
-	if err != nil {
-		return false, err
-	}
-	if vd.Mitigated.Valid {
-		return false, nil
-	}
-	return true, nil
+// UpdateAffected will update the system ID associated with the (vid, oldSid) row to newSid.
+func UpdateAffected(tx *sql.Tx, vid, oldSid, newSid int) Err {
+	return execUpdates(tx, ssUpdateAffected, newSid, vid, oldSid)
 }
 
 // UpdateCve will update the CVE for the given vulnerability ID.
-func UpdateCve(tx *sql.Tx, vid int, cve string) error {
+func UpdateCve(tx *sql.Tx, vid int, cve string) Err {
 	return execUpdates(tx, ssUpdateCve, cve, vid)
 }
 
@@ -363,21 +398,44 @@ func UpdateCorpScore(tx *sql.Tx, vid int, cscore float32) Err {
 	return execUpdates(tx, ssUpdateCorpScore, cscore, vid)
 }
 
+// UpdateExploit will update the exploit and the exploitable column for the given vulnerability ID.
+// To set the exploitable column to false and have a NULL value for the exploita column, pass in
+// an empty string to exploit.
+func UpdateExploit(tx *sql.Tx, vid int, exploit string) Err {
+	s := toNullString(exploit)
+	return execUpdates(tx, ssUpdateExploit, s.Valid, s, vid)
+}
+
 // UpdateInitDate will update the date that the vulnerability assessment was initiated for the given vulnerability ID.
 func UpdateInitDate(tx *sql.Tx, vid int, initDate string) Err {
 	return execUpdates(tx, ssUpdateInitDate, initDate, vid)
 }
 
 // UpdateMitDate will update the date that the vulnerability assessment was mitigated for the given vulnerability ID.
+// To set the mitigation date to NULL, pass in an empty string for mitDate.
 func UpdateMitDate(tx *sql.Tx, vid int, mitDate string) Err {
-	return execUpdates(tx, ssUpdateMitDate, mitDate, vid)
+	s := toNullString(mitDate)
+	return execUpdates(tx, ssUpdateMitDate, s, vid)
 }
 
 // UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.
+// To set the published date to NULL, pass in an empty string for pubDate.
 func UpdatePubDate(tx *sql.Tx, vid int, pubDate string) Err {
-	return execUpdates(tx, ssUpdatePubDate, pubDate, vid)
+	s := toNullString(pubDate)
+	return execUpdates(tx, ssUpdatePubDate, s, vid)
 }
 
+// UpdateRefers will update the url associated with the (vid, oldUrl) row to newUrl.
+func UpdateRefers(tx *sql.Tx, vid int, oldUrl, newUrl string) Err {
+	return execUpdates(tx, ssUpdateRefers, newUrl, vid, oldUrl)
+}
+
+// UpdateTicket will update the ticket associated with the (vid, oldTicket) row to newTicket.
+func UpdateTicket(tx *sql.Tx, vid int, oldTicket, newTicket string) Err {
+	return execUpdates(tx, ssUpdateTicket, newTicket, vid, oldTicket)
+}
+
+// execUpdates executes the query referenced by ss in the queries map and returns any errors.
 func execUpdates(tx *sql.Tx, ss sqlStatement, args ...interface{}) Err {
 	var err Err
 	res, e := tx.Stmt(queries[ss]).Exec(args)

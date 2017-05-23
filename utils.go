@@ -72,3 +72,8 @@ func prepareStatements(db *sql.DB) error {
 	}
 	return nil
 }
+
+// toNullString invalidates a sql.NullString if empty, validates if not empty.
+func toNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
+}
