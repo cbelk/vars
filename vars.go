@@ -3,6 +3,7 @@ package vars
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/lib/pq" // Postgresql driver
 )
@@ -13,11 +14,14 @@ const (
 	ssActiveSystems sqlStatement = iota
 	ssCheckName
 	ssDecomSystem
+	ssGetVuln
 	ssGetVulnDates
 	ssGetVulnID
 	ssInsertAffected
+	ssInsertDates
 	ssInsertEmployee
 	ssInsertExploit
+	ssInsertImpact
 	ssInsertRefers
 	ssInsertSystem
 	ssInsertTicket
@@ -39,14 +43,17 @@ const (
 var (
 	queries      map[sqlStatement]*sql.Stmt
 	queryStrings = map[sqlStatement]string{
-		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
-		ssCheckName:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
-		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
+		ssActiveSystems: "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
+		ssCheckName:     "SELECT vulnid FROM vuln WHERE vulnname=$1;",
+		ssDecomSystem:   "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
+		//ssGetVuln:         "SELECT v.cve, v.finder, v.initiator, v.summary, v.test, v.mitigation, ",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
+		ssInsertDates:     "INSERT INTO dates (vulnid, published, initiated, mitigated) VALUES ($1, $2, $3, $4);",
 		ssInsertEmployee:  "INSERT INTO emp (firstname, lastname, email) VALUES ($1, $2, $3);",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
+		ssInsertImpact:    "INSERT INTO impact (vulnid, cvss, cvsslink, corpscore) VALUES ($1, $2, $3, $4);",
 		ssInsertRefers:    "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:    "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
 		ssInsertTicket:    "INSERT INTO tickets (vulnid, ticket) VALUES ($1, $2);",
@@ -65,7 +72,9 @@ var (
 	}
 	execNames = map[sqlStatement]string{
 		ssInsertAffected:  "InsertAffected",
+		ssInsertDates:     "InsertDates",
 		ssInsertExploit:   "InsertExploit",
+		ssInsertImpact:    "InsertImpact",
 		ssInsertRefers:    "InsertRef",
 		ssInsertTicket:    "InsertTicket",
 		ssInsertVuln:      "InsertVulnerability",
@@ -188,47 +197,78 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 	var e interface{}
 
 	// Setting values in the impact table
-	e = SetImpact(tx, vuln)
+	e = InsertImpact(tx, vuln.ID, vuln.Cvss, vuln.CorpScore, vuln.CvssLink)
 	if ve, ok := e.(Err); ok {
-		if !ve.IsNoRowsError() {
-			return ve
+		if !IsNilErr(ve) {
+			if !ve.IsNoRowsError() {
+				return ve
+			}
+			errs.appendFromError(ve, "AddVulnerability")
 		}
-		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
-		errs.appendFromErrs(ves)
+		if !IsNilErr(ves) {
+			errs.appendFromErrs(ves)
+		}
 	}
 
 	// Setting values in the dates table
-	e = SetDates(tx, vuln)
+	e = InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
 	if ve, ok := e.(Err); ok {
-		if !ve.IsNoRowsError() {
-			return ve
+		if !IsNilErr(ve) {
+			if !ve.IsNoRowsError() {
+				return ve
+			}
+			errs.appendFromError(ve, "AddVulnerability")
 		}
-		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
-		errs.appendFromErrs(ves)
+		if !IsNilErr(ves) {
+			errs.appendFromErrs(ves)
+		}
 	}
 
 	// Setting values in the tickets table
 	e = SetTickets(tx, vuln)
 	if ve, ok := e.(Err); ok {
-		if !ve.IsNoRowsError() {
-			return ve
+		if !IsNilErr(ve) {
+			if !ve.IsNoRowsError() {
+				return ve
+			}
+			errs.appendFromError(ve, "AddVulnerability")
 		}
-		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
-		errs.appendFromErrs(ves)
+		if !IsNilErr(ves) {
+			errs.appendFromErrs(ves)
+		}
 	}
 
 	// Setting values in the ref table
 	e = SetReferences(tx, vuln)
 	if ve, ok := e.(Err); ok {
-		if !ve.IsNoRowsError() {
-			return ve
+		if !IsNilErr(ve) {
+			if !ve.IsNoRowsError() {
+				return ve
+			}
+			errs.appendFromError(ve, "AddVulnerability")
 		}
-		errs.appendFromError(ve, "AddVulnerability")
 	} else if ves, ok := e.(Errs); ok {
-		errs.appendFromErrs(ves)
+		if !IsNilErr(ves) {
+			errs.appendFromErrs(ves)
+		}
+	}
+
+	// Setting values in the exploits table
+	e = SetExploit(tx, vuln)
+	if ve, ok := e.(Err); ok {
+		if !IsNilErr(ve) {
+			if !ve.IsNoRowsError() {
+				return ve
+			}
+			errs.appendFromError(ve, "AddVulnerability")
+		}
+	} else if ves, ok := e.(Errs); ok {
+		if !IsNilErr(ves) {
+			errs.appendFromErrs(ves)
+		}
 	}
 
 	rollback = false
@@ -271,6 +311,16 @@ func GetActiveSystems() (*[]System, error) {
 	return &systems, nil
 }
 
+/*
+func GetVulnerability(vname string) *Vulnerability {
+    id, err := GetVulnID(vname)
+    if !IsNilErr(err) {
+        return err
+    }
+
+}
+*/
+
 // GetVulnID returns the vulnid associated with the vname.
 func GetVulnID(vname string) (int64, error) {
 	var id int64
@@ -284,6 +334,16 @@ func GetVulnID(vname string) (int64, error) {
 // InsertAffected will insert a new row into the affected table with key (vid, sid).
 func InsertAffected(tx *sql.Tx, vid int64, sid int) Err {
 	return execUpdates(tx, ssInsertAffected, vid, sid)
+}
+
+// InsertDates inserts the dates published, initiated, and mitigated.
+func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit sql.NullString) error {
+	return execUpdates(tx, ssInsertDates, vid, pub, ini, mit)
+}
+
+// InsertImpact inserts the dates published, initiated, and mitigated.
+func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink sql.NullString) error {
+	return execUpdates(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
 }
 
 // InsertRef will insert a new row into the ref table with key (vid, url).
@@ -328,6 +388,7 @@ func NameIsAvailable(vname string) (bool, error) {
 	return false, nil
 }
 
+/*
 // SetImpact updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
 // It will not do a partial update as in if something fails, the transaction is rolled back.
 func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
@@ -364,36 +425,37 @@ func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
 
 // SetDates updates the dates published, initiated, and mitigated.
 func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
-	var errs Errs
-	if vuln.Dates.Published.Valid {
-		err := UpdatePubDate(tx, vuln.ID, vuln.Dates.Published.String)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetDates")
-		}
-	}
-	if vuln.Dates.Initiated != "" {
-		err := UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetDates")
-		}
-	}
-	if vuln.Dates.Mitigated.Valid {
-		err := UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated.String)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetDates")
-		}
-	}
-	return errs
+    var errs Errs
+    if vuln.Dates.Published.Valid {
+        err := UpdatePubDate(tx, vuln.ID, vuln.Dates.Published.String)
+        if err.err != nil {
+            if !err.IsNoRowsError() {
+                return err
+            }
+            errs.appendFromError(err, "SetDates")
+        }
+    }
+    if vuln.Dates.Initiated != "" {
+        err := UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
+        if err.err != nil {
+            if !err.IsNoRowsError() {
+                return err
+            }
+            errs.appendFromError(err, "SetDates")
+        }
+    }
+    if vuln.Dates.Mitigated.Valid {
+        err := UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated.String)
+        if err.err != nil {
+            if !err.IsNoRowsError() {
+                return err
+            }
+            errs.appendFromError(err, "SetDates")
+        }
+    }
+    return errs
 }
+*/
 
 // SetExploit inserts an entry into the exploits table if the exploit string isn't zero valued.
 func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
@@ -407,10 +469,11 @@ func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
 // SetReferences inserts entries into the ref table for all URLs in the slice.
 func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
+	fmt.Printf("Refs are %v\n\n", vuln.References)
 	if len(vuln.References) > 0 {
 		for _, r := range vuln.References {
 			err := InsertRef(tx, vuln.ID, r)
-			if err.err != nil {
+			if !IsNilErr(err) {
 				if !err.IsNoRowsError() {
 					return err
 				}
@@ -427,7 +490,7 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 	if len(vuln.Tickets) > 0 {
 		for _, t := range vuln.Tickets {
 			err := InsertTicket(tx, vuln.ID, t)
-			if err.err != nil {
+			if !IsNilErr(err) {
 				if !err.IsNoRowsError() {
 					return err
 				}
