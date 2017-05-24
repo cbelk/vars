@@ -21,6 +21,10 @@ var (
 		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it"},
 		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it"},
 	}
+	vulns = []vars.Vulnerability{
+		{Name: "DirtyCOW", Cve: sql.NullString{String: "CVE-2016-5195", Valid: true}, Cvss: 7.8, CorpScore: 8, CvssLink: sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: sql.NullString{String: "11/10/2016", Valid: true}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}, Exploitable: sql.NullBool{Bool: true, Valid: true}},
+		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/1/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
+	}
 )
 
 func main() {
@@ -40,39 +44,54 @@ func main() {
 	}
 
 	// Test adding all systems
-	err = testAddSystems(db, 0, 1, 2)
+	fmt.Println("Adding systems ...")
+	err = testAddSystems(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test getting all active systems
-	err = testGetActiveSystems(db)
+	fmt.Println("Active systems are:")
+	err = testGetActiveSystems()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test adding all employees
-	err = testAddEmps(db, 0, 1, 2, 3)
+	fmt.Println("Adding employees ...")
+	err = testAddEmps(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test decomissioning a system
-	err = testDecomSystem(db, 2)
+	s := 2
+	fmt.Println("Decomissioning system ", systems[s].Name)
+	err = testDecomSystem(db, s)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test getting all active systems again
-	err = testGetActiveSystems(db)
+	fmt.Println("Active systems are:")
+	err = testGetActiveSystems()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Test adding vulnerabilites
+	fmt.Println("Adding vulnerabilities ...")
+	err = testAddVulnerabilities(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Done!")
 }
 
-func testAddSystems(db *sql.DB, stms ...int) error {
-	for _, v := range stms {
-		err := vars.AddSystem(db, &systems[v])
+func testAddSystems(db *sql.DB) error {
+	for _, v := range systems {
+		err := vars.AddSystem(db, &v)
 		if err != nil {
 			return err
 		}
@@ -80,9 +99,9 @@ func testAddSystems(db *sql.DB, stms ...int) error {
 	return nil
 }
 
-func testAddEmps(db *sql.DB, eps ...int) error {
-	for _, v := range eps {
-		err := vars.AddEmployee(db, &emps[v])
+func testAddEmps(db *sql.DB) error {
+	for _, v := range emps {
+		err := vars.AddEmployee(db, &v)
 		if err != nil {
 			return err
 		}
@@ -100,13 +119,23 @@ func testDecomSystem(db *sql.DB, stms ...int) error {
 	return nil
 }
 
-func testGetActiveSystems(db *sql.DB) error {
-	syss, err := vars.GetActiveSystems(db)
+func testGetActiveSystems() error {
+	syss, err := vars.GetActiveSystems()
 	if err != nil {
 		return err
 	}
 	for _, sys := range *syss {
 		fmt.Println(sys)
+	}
+	return nil
+}
+
+func testAddVulnerabilities(db *sql.DB) error {
+	for _, v := range vulns {
+		err := vars.AddVulnerability(db, &v)
+		if !vars.IsNilErr(err) {
+			return err
+		}
 	}
 	return nil
 }
