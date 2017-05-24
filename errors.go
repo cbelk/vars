@@ -11,6 +11,8 @@ type errType int
 const (
 	noRowsInserted errType = iota
 	noRowsUpdated
+	nameNotAvailable
+	genericVars
 )
 
 var (
@@ -18,6 +20,8 @@ var (
 	ErrNoRowsInserted = errors.New("No rows were inserted")
 	//ErrNoRowsUpdated is used when there were not any rows updated in the table
 	ErrNoRowsUpdated = errors.New("No rows were updated")
+	//ErrNameNotAvailable is used when the provided vulnnerability name is not available
+	ErrNameNotAvailable = errors.New("The provided vulnerability name is not available")
 	//ErrGenericVars is used when the error is too generic
 	ErrGenericVars = errors.New("Something went wrong")
 )
@@ -37,6 +41,8 @@ func newErr(errT errType, parents ...string) Err {
 		err.err = ErrNoRowsInserted
 	case noRowsUpdated:
 		err.err = ErrNoRowsUpdated
+	case nameNotAvailable:
+		err.err = ErrNameNotAvailable
 	default:
 		err.err = ErrGenericVars
 	}
@@ -75,6 +81,33 @@ func (e Err) IsNoRowsError() bool {
 func IsNoRowsError(err error) bool {
 	if varsErr, ok := err.(Err); ok {
 		return varsErr.IsNoRowsError()
+	}
+	return false
+}
+
+// IsNilErr type asserts the provided error (error, Err, Errs) and returns true if the error is nil,
+// false otherwise.
+func IsNilErr(e interface{}) bool {
+	if ve, ok := e.(Err); ok {
+		if ve.err == nil {
+			return true
+		}
+		return false
+	} else if ves, ok := e.(Errs); ok {
+		if len(ves) == 0 {
+			return true
+		}
+		for v := range ves {
+			if !IsNilErr(v) {
+				return false
+			}
+		}
+		return true
+	} else if er, ok := e.(error); ok {
+		if er != nil {
+			return false
+		}
+		return true
 	}
 	return false
 }
