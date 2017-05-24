@@ -14,7 +14,7 @@ const (
 	ssCheckName
 	ssDecomSystem
 	ssGetVulnDates
-	ssGetVulnId
+	ssGetVulnID
 	ssInsertAffected
 	ssInsertEmployee
 	ssInsertExploit
@@ -43,7 +43,7 @@ var (
 		ssCheckName:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
-		ssGetVulnId:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
+		ssGetVulnID:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
 		ssInsertEmployee:  "INSERT INTO emp (firstname, lastname, email) VALUES ($1, $2, $3);",
 		ssInsertExploit:   "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
@@ -271,11 +271,12 @@ func GetActiveSystems() (*[]System, error) {
 	return &systems, nil
 }
 
-func GetVulnId(vname string) (int64, error) {
+// GetVulnID returns the vulnid associated with the vname.
+func GetVulnID(vname string) (int64, error) {
 	var id int64
-	err := queries[ssGetVulnId].QueryRow(vname).Scan(&id)
+	err := queries[ssGetVulnID].QueryRow(vname).Scan(&id)
 	if err != nil {
-		return id, newErrFromErr(err, "GetVulnId")
+		return id, newErrFromErr(err, "GetVulnID")
 	}
 	return id, nil
 }
@@ -295,6 +296,7 @@ func InsertTicket(tx *sql.Tx, vid int64, ticket string) Err {
 	return execUpdates(tx, ssInsertTicket, vid, ticket)
 }
 
+// InsertVulnerability will insert a new row into the vuln table.
 func InsertVulnerability(tx *sql.Tx, vname, cve string, finder, initiator int, summary, test, mitigation string) error {
 	return execUpdates(tx, ssInsertVuln, vname, cve, finder, initiator, summary, test, mitigation)
 }
@@ -488,9 +490,9 @@ func UpdatePubDate(tx *sql.Tx, vid int64, pubDate string) Err {
 	return execUpdates(tx, ssUpdatePubDate, s, vid)
 }
 
-// UpdateRefers will update the url associated with the (vid, oldUrl) row to newUrl.
-func UpdateRefers(tx *sql.Tx, vid int64, oldUrl, newUrl string) Err {
-	return execUpdates(tx, ssUpdateRefers, newUrl, vid, oldUrl)
+// UpdateRefers will update the url associated with the (vid, oldURL) row to newURL.
+func UpdateRefers(tx *sql.Tx, vid int64, oldURL, newURL string) Err {
+	return execUpdates(tx, ssUpdateRefers, newURL, vid, oldURL)
 }
 
 // UpdateTicket will update the ticket associated with the (vid, oldTicket) row to newTicket.

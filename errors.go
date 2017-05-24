@@ -89,10 +89,7 @@ func IsNoRowsError(err error) bool {
 // false otherwise.
 func IsNilErr(e interface{}) bool {
 	if ve, ok := e.(Err); ok {
-		if ve.err == nil {
-			return true
-		}
-		return false
+		return ve.err == nil
 	} else if ves, ok := e.(Errs); ok {
 		if len(ves) == 0 {
 			return true
@@ -104,10 +101,7 @@ func IsNilErr(e interface{}) bool {
 		}
 		return true
 	} else if er, ok := e.(error); ok {
-		if er != nil {
-			return false
-		}
-		return true
+		return er == nil
 	}
 	return false
 }
