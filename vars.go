@@ -3,7 +3,6 @@ package vars
 
 import (
 	"database/sql"
-	"fmt"
 
 	_ "github.com/lib/pq" // Postgresql driver
 )
@@ -14,6 +13,10 @@ const (
 	ssActiveSystems sqlStatement = iota
 	ssCheckName
 	ssDecomSystem
+	ssGetExploit
+	ssGetReferences
+	ssGetSystems
+	ssGetTickets
 	ssGetVuln
 	ssGetVulnDates
 	ssGetVulnID
@@ -43,10 +46,14 @@ const (
 var (
 	queries      map[sqlStatement]*sql.Stmt
 	queryStrings = map[sqlStatement]string{
-		ssActiveSystems: "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
-		ssCheckName:     "SELECT vulnid FROM vuln WHERE vulnname=$1;",
-		ssDecomSystem:   "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
-		//ssGetVuln:         "SELECT v.cve, v.finder, v.initiator, v.summary, v.test, v.mitigation, ",
+		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
+		ssCheckName:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
+		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
+		ssGetExploit:      "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
+		ssGetReferences:   "SELECT url FROM ref WHERE vulnid=$1;",
+		ssGetSystems:      "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
+		ssGetTickets:      "SELECT ticket FROM tickets WHERE vulnid=$1;",
+		ssGetVuln:         "SELECT cve, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
@@ -71,6 +78,10 @@ var (
 		ssUpdateTicket:    "UPDATE tickets SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
 	}
 	execNames = map[sqlStatement]string{
+		ssGetExploit:      "GetExploit",
+		ssGetReferences:   "GetReferences",
+		ssGetSystems:      "GetSystems",
+		ssGetTickets:      "GetTickets",
 		ssInsertAffected:  "InsertAffected",
 		ssInsertDates:     "InsertDates",
 		ssInsertExploit:   "InsertExploit",
@@ -290,36 +301,94 @@ func DecommissionSystem(db *sql.DB, name string) error {
 	return nil
 }
 
+func GetExploit(vid int64) (sql.NullString, sql.NullBool, error) {
+	var exploit sql.NullString
+	var exploitable sql.NullBool
+	err := queries[ssGetExploit].QueryRow(vid).Scan(&exploitable, &exploit)
+	if err != nil && err != sql.ErrNoRows {
+		return exploit, exploitable, newErrFromErr(err, "GetExploit")
+	}
+	return exploit, exploitable, nil
+}
+
 // GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
 func GetActiveSystems() (*[]System, error) {
-	systems := []System{}
-	rows, err := queries[ssActiveSystems].Query()
+	return execGetRowsSys(ssActiveSystems)
+}
+
+// GetReferences returns a pointer to a slice of urls associated with the vulnid.
+func GetReferences(vid int64) (*[]string, error) {
+	return execGetRowsStr(ssGetReferences, vid)
+}
+
+// GetSystems returns a pointer to a slice of System types representing all systems.
+func GetSystems() (*[]System, error) {
+	return execGetRowsSys(ssGetSystems)
+}
+
+// GetTickets returns a spointer to a lice of tickets associated with the vulnid.
+func GetTickets(vid int64) (*[]string, error) {
+	return execGetRowsStr(ssGetTickets, vid)
+}
+
+func GetVulnerability(vname string) (*Vulnerability, error) {
+	var vuln Vulnerability
+
+	// Get vulnid
+	id, err := GetVulnID(vname)
+	if !IsNilErr(err) {
+		return &vuln, err
+	}
+	vuln.ID = id
+	vuln.Name = vname
+
+	// Get vuln fields
+	err = queries[ssGetVuln].QueryRow(id).Scan(&vuln.Cve, &vuln.Finder, &vuln.Initiator, &vuln.Summary, &vuln.Test, &vuln.Mitigation)
 	if err != nil {
-		return &systems, newErrFromErr(err, "GetActiveSystems")
+		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var sys System
-		if err := rows.Scan(&sys.ID, &sys.Name, &sys.Type, &sys.OpSys, &sys.Location, &sys.Description); err != nil {
-			return &systems, newErrFromErr(err, "GetActiveSystems", "rows.Scan")
-		}
-		systems = append(systems, sys)
+
+	// Get dates
+	vd, err := GetVulnDates(id)
+	if !IsNilErr(err) {
+		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
-	if err := rows.Err(); err != nil {
-		return &systems, newErrFromErr(err, "GetActiveSystems")
+	vuln.Dates = *vd
+
+	// Get tickets
+	ticks, err := GetTickets(id)
+	if !IsNilErr(err) {
+		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
-	return &systems, nil
+	vuln.Tickets = *ticks
+
+	// Get references
+	refs, err := GetReferences(id)
+	if !IsNilErr(err) {
+		return &vuln, newErrFromErr(err, "GetVulnerability")
+	}
+	vuln.References = *refs
+
+	// Get exploit
+	exploit, exploitable, err := GetExploit(id)
+	if !IsNilErr(err) {
+		return &vuln, newErrFromErr(err, "GetVulnerability")
+	}
+	vuln.Exploit = exploit
+	vuln.Exploitable = exploitable
+
+	return &vuln, nil
 }
 
-/*
-func GetVulnerability(vname string) *Vulnerability {
-    id, err := GetVulnID(vname)
-    if !IsNilErr(err) {
-        return err
-    }
-
+// GetVulnDates returns a VulnDates object with the dates row associated with the vulnid.
+func GetVulnDates(vid int64) (*VulnDates, error) {
+	var vd VulnDates
+	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
+	if err != nil {
+		return &vd, newErrFromErr(err, "GetVulnDates")
+	}
+	return &vd, nil
 }
-*/
 
 // GetVulnID returns the vulnid associated with the vname.
 func GetVulnID(vname string) (int64, error) {
@@ -364,9 +433,8 @@ func InsertVulnerability(tx *sql.Tx, vname, cve string, finder, initiator int, s
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
 // false otherwise.
 func IsVulnOpen(vid int64) (bool, error) {
-	var vd VulnDates
-	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
-	if err != nil {
+	vd, err := GetVulnDates(vid)
+	if !IsNilErr(err) {
 		return false, newErrFromErr(err, "IsVulnOpen")
 	}
 	if vd.Mitigated.Valid {
@@ -388,75 +456,6 @@ func NameIsAvailable(vname string) (bool, error) {
 	return false, nil
 }
 
-/*
-// SetImpact updates the CVSS score and links and the Corporate Risk Score for a vulnerability.
-// It will not do a partial update as in if something fails, the transaction is rolled back.
-func SetImpact(tx *sql.Tx, vuln *Vulnerability) error {
-	var errs Errs
-	if vuln.Cvss != 0 {
-		err := UpdateCvss(tx, vuln.ID, vuln.Cvss)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetImpact")
-		}
-	}
-	if vuln.CvssLink.Valid {
-		err := UpdateCvssLink(tx, vuln.ID, vuln.CvssLink.String)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetImpact")
-		}
-	}
-	if vuln.CorpScore != 0 {
-		err := UpdateCorpScore(tx, vuln.ID, vuln.CorpScore)
-		if err.err != nil {
-			if !err.IsNoRowsError() {
-				return err
-			}
-			errs.appendFromError(err, "SetImpact")
-		}
-	}
-	return errs
-}
-
-// SetDates updates the dates published, initiated, and mitigated.
-func SetDates(tx *sql.Tx, vuln *Vulnerability) error {
-    var errs Errs
-    if vuln.Dates.Published.Valid {
-        err := UpdatePubDate(tx, vuln.ID, vuln.Dates.Published.String)
-        if err.err != nil {
-            if !err.IsNoRowsError() {
-                return err
-            }
-            errs.appendFromError(err, "SetDates")
-        }
-    }
-    if vuln.Dates.Initiated != "" {
-        err := UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
-        if err.err != nil {
-            if !err.IsNoRowsError() {
-                return err
-            }
-            errs.appendFromError(err, "SetDates")
-        }
-    }
-    if vuln.Dates.Mitigated.Valid {
-        err := UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated.String)
-        if err.err != nil {
-            if !err.IsNoRowsError() {
-                return err
-            }
-            errs.appendFromError(err, "SetDates")
-        }
-    }
-    return errs
-}
-*/
-
 // SetExploit inserts an entry into the exploits table if the exploit string isn't zero valued.
 func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
 	var err Err
@@ -469,7 +468,6 @@ func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
 // SetReferences inserts entries into the ref table for all URLs in the slice.
 func SetReferences(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
-	fmt.Printf("Refs are %v\n\n", vuln.References)
 	if len(vuln.References) > 0 {
 		for _, r := range vuln.References {
 			err := InsertRef(tx, vuln.ID, r)
@@ -527,7 +525,7 @@ func UpdateCorpScore(tx *sql.Tx, vid int64, cscore float32) Err {
 }
 
 // UpdateExploit will update the exploit and the exploitable column for the given vulnerability ID.
-// To set the exploitable column to false and have a NULL value for the exploita column, pass in
+// To set the exploitable column to false and have a NULL value for the exploits column, pass in
 // an empty string to exploit.
 func UpdateExploit(tx *sql.Tx, vid int64, exploit string) Err {
 	s := toNullString(exploit)
@@ -568,10 +566,52 @@ func execUpdates(tx *sql.Tx, ss sqlStatement, args ...interface{}) Err {
 	var err Err
 	res, e := tx.Stmt(queries[ss]).Exec(args...)
 	if e != nil {
-		return newErrFromErr(e, execNames[ss])
+		return newErrFromErr(e, execNames[ss], "execUpdates")
 	}
 	if rows, _ := res.RowsAffected(); rows < 1 {
-		err = newErr(noRowsUpdated, execNames[ss])
+		err = newErr(noRowsUpdated, execNames[ss], "execUpdates")
 	}
 	return err
+}
+
+// execGetRowsStr executes the query referenced by ss in the queries map and returns a pointer to a slice of string and an error.
+func execGetRowsStr(ss sqlStatement, args ...interface{}) (*[]string, error) {
+	var res []string
+	rows, err := queries[ss].Query(args...)
+	if err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr", "rows.scan")
+		}
+		res = append(res, r)
+	}
+	if err := rows.Err(); err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr")
+	}
+	return &res, nil
+}
+
+// execGetRowsSys executes the query referenced by ss in the queries map and returns a pointer to a slice of System and an error.
+func execGetRowsSys(ss sqlStatement, args ...interface{}) (*[]System, error) {
+	res := []System{}
+	rows, err := queries[ss].Query(args...)
+	if err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r System
+		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.OpSys, &r.Location, &r.Description); err != nil {
+			return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.scan")
+		}
+		res = append(res, r)
+	}
+	if err := rows.Err(); err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
+	}
+	return &res, nil
 }
