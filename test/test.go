@@ -37,14 +37,14 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Println("Config is:")
-	fmt.Println(vars.Conf, "\n")
+	fmt.Println(vars.Conf, "\n\n")
 	db, err := vars.ConnectDB(&vars.Conf)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test adding all systems
-	fmt.Println("Adding systems ...")
+	fmt.Println("Adding systems ...\n\n")
 	err = testAddSystems(db)
 	if err != nil {
 		log.Fatal(err)
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	// Test adding all employees
-	fmt.Println("Adding employees ...")
+	fmt.Println("Adding employees ...\n\n")
 	err = testAddEmps(db)
 	if err != nil {
 		log.Fatal(err)
@@ -66,7 +66,7 @@ func main() {
 
 	// Test decomissioning a system
 	s := 2
-	fmt.Println("Decomissioning system ", systems[s].Name)
+	fmt.Println("Decomissioning system ", systems[s].Name, "\n")
 	err = testDecomSystem(db, s)
 	if err != nil {
 		log.Fatal(err)
@@ -80,13 +80,32 @@ func main() {
 	}
 
 	// Test adding vulnerabilites
-	fmt.Println("Adding vulnerabilities ...")
+	fmt.Println("Adding vulnerabilities ...\n\n")
 	err = testAddVulnerabilities(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Test getting vulnerabilities
+	v := 1
+	fmt.Println("Vulnerability is:")
+	err = testGetVulnerability(vulns[v].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Done!")
+}
+
+func testGetVulnerability(vname string) error {
+	fmt.Printf("vname is %v\n\n", vname)
+	vuln, err := vars.GetVulnerability(vname)
+	if !vars.IsNilErr(err) {
+		fmt.Println("Error in testGetVulnerability")
+		return err
+	}
+	fmt.Println(vuln)
+	return nil
 }
 
 func testAddSystems(db *sql.DB) error {
@@ -125,7 +144,7 @@ func testGetActiveSystems() error {
 		return err
 	}
 	for _, sys := range *syss {
-		fmt.Println(sys)
+		fmt.Println(sys, "\n")
 	}
 	return nil
 }
