@@ -428,32 +428,32 @@ func GetVulnID(vname string) (int64, error) {
 
 // InsertAffected will insert a new row into the affected table with key (vid, sid).
 func InsertAffected(tx *sql.Tx, vid int64, sid int) Err {
-	return execUpdates(tx, ssInsertAffected, vid, sid)
+	return execMutation(tx, ssInsertAffected, vid, sid)
 }
 
 // InsertDates inserts the dates published, initiated, and mitigated.
 func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit sql.NullString) error {
-	return execUpdates(tx, ssInsertDates, vid, pub, ini, mit)
+	return execMutation(tx, ssInsertDates, vid, pub, ini, mit)
 }
 
 // InsertImpact inserts the dates published, initiated, and mitigated.
 func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink sql.NullString) error {
-	return execUpdates(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
+	return execMutation(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
 }
 
 // InsertRef will insert a new row into the ref table with key (vid, url).
 func InsertRef(tx *sql.Tx, vid int64, url string) Err {
-	return execUpdates(tx, ssInsertRefers, vid, url)
+	return execMutation(tx, ssInsertRefers, vid, url)
 }
 
 // InsertTicket will insert a new row into the ticket table with key (vid, ticket).
 func InsertTicket(tx *sql.Tx, vid int64, ticket string) Err {
-	return execUpdates(tx, ssInsertTicket, vid, ticket)
+	return execMutation(tx, ssInsertTicket, vid, ticket)
 }
 
 // InsertVulnerability will insert a new row into the vuln table.
 func InsertVulnerability(tx *sql.Tx, vname, cve string, finder, initiator int, summary, test, mitigation string) error {
-	return execUpdates(tx, ssInsertVuln, vname, cve, finder, initiator, summary, test, mitigation)
+	return execMutation(tx, ssInsertVuln, vname, cve, finder, initiator, summary, test, mitigation)
 }
 
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,
@@ -486,7 +486,7 @@ func NameIsAvailable(vname string) (bool, error) {
 func SetExploit(tx *sql.Tx, vuln *Vulnerability) error {
 	var err Err
 	if vuln.Exploit.Valid {
-		err = execUpdates(tx, ssInsertExploit, vuln.ID, true, vuln.Exploit.String)
+		err = execMutation(tx, ssInsertExploit, vuln.ID, true, vuln.Exploit.String)
 	}
 	return err
 }
@@ -527,27 +527,27 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 
 // UpdateAffected will update the system ID associated with the (vid, oldSid) row to newSid.
 func UpdateAffected(tx *sql.Tx, vid int64, oldSid, newSid int) Err {
-	return execUpdates(tx, ssUpdateAffected, newSid, vid, oldSid)
+	return execMutation(tx, ssUpdateAffected, newSid, vid, oldSid)
 }
 
 // UpdateCve will update the CVE for the given vulnerability ID.
 func UpdateCve(tx *sql.Tx, vid int64, cve string) Err {
-	return execUpdates(tx, ssUpdateCve, cve, vid)
+	return execMutation(tx, ssUpdateCve, cve, vid)
 }
 
 // UpdateCvss will update the CVSS score for the given vulnerability ID.
 func UpdateCvss(tx *sql.Tx, vid int64, cvss float32) Err {
-	return execUpdates(tx, ssUpdateCvss, cvss, vid)
+	return execMutation(tx, ssUpdateCvss, cvss, vid)
 }
 
 // UpdateCvssLink will update the link to the CVSS score for the given vulnerability ID.
 func UpdateCvssLink(tx *sql.Tx, vid int64, cvssLink string) Err {
-	return execUpdates(tx, ssUpdateCvssLink, cvssLink, vid)
+	return execMutation(tx, ssUpdateCvssLink, cvssLink, vid)
 }
 
 // UpdateCorpScore will update the corporate score for the given vulnerability ID.
 func UpdateCorpScore(tx *sql.Tx, vid int64, cscore float32) Err {
-	return execUpdates(tx, ssUpdateCorpScore, cscore, vid)
+	return execMutation(tx, ssUpdateCorpScore, cscore, vid)
 }
 
 // UpdateExploit will update the exploit and the exploitable column for the given vulnerability ID.
@@ -555,47 +555,47 @@ func UpdateCorpScore(tx *sql.Tx, vid int64, cscore float32) Err {
 // an empty string to exploit.
 func UpdateExploit(tx *sql.Tx, vid int64, exploit string) Err {
 	s := toNullString(exploit)
-	return execUpdates(tx, ssUpdateExploit, s.Valid, s, vid)
+	return execMutation(tx, ssUpdateExploit, s.Valid, s, vid)
 }
 
 // UpdateInitDate will update the date that the vulnerability assessment was initiated for the given vulnerability ID.
 func UpdateInitDate(tx *sql.Tx, vid int64, initDate string) Err {
-	return execUpdates(tx, ssUpdateInitDate, initDate, vid)
+	return execMutation(tx, ssUpdateInitDate, initDate, vid)
 }
 
 // UpdateMitDate will update the date that the vulnerability assessment was mitigated for the given vulnerability ID.
 // To set the mitigation date to NULL, pass in an empty string for mitDate.
 func UpdateMitDate(tx *sql.Tx, vid int64, mitDate string) Err {
 	s := toNullString(mitDate)
-	return execUpdates(tx, ssUpdateMitDate, s, vid)
+	return execMutation(tx, ssUpdateMitDate, s, vid)
 }
 
 // UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.
 // To set the published date to NULL, pass in an empty string for pubDate.
 func UpdatePubDate(tx *sql.Tx, vid int64, pubDate string) Err {
 	s := toNullString(pubDate)
-	return execUpdates(tx, ssUpdatePubDate, s, vid)
+	return execMutation(tx, ssUpdatePubDate, s, vid)
 }
 
 // UpdateRefers will update the url associated with the (vid, oldURL) row to newURL.
 func UpdateRefers(tx *sql.Tx, vid int64, oldURL, newURL string) Err {
-	return execUpdates(tx, ssUpdateRefers, newURL, vid, oldURL)
+	return execMutation(tx, ssUpdateRefers, newURL, vid, oldURL)
 }
 
 // UpdateTicket will update the ticket associated with the (vid, oldTicket) row to newTicket.
 func UpdateTicket(tx *sql.Tx, vid int64, oldTicket, newTicket string) Err {
-	return execUpdates(tx, ssUpdateTicket, newTicket, vid, oldTicket)
+	return execMutation(tx, ssUpdateTicket, newTicket, vid, oldTicket)
 }
 
-// execUpdates executes the query referenced by ss in the queries map and returns any errors.
-func execUpdates(tx *sql.Tx, ss sqlStatement, args ...interface{}) Err {
+// execMutation executes the query referenced by ss in the queries map and returns any errors.
+func execMutation(tx *sql.Tx, ss sqlStatement, args ...interface{}) Err {
 	var err Err
 	res, e := tx.Stmt(queries[ss]).Exec(args...)
 	if e != nil {
-		return newErrFromErr(e, execNames[ss], "execUpdates")
+		return newErrFromErr(e, execNames[ss], "execMutation")
 	}
 	if rows, _ := res.RowsAffected(); rows < 1 {
-		err = newErr(noRowsUpdated, execNames[ss], "execUpdates")
+		err = newErr(noRowsUpdated, execNames[ss], "execMutation")
 	}
 	return err
 }
