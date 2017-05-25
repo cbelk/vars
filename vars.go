@@ -18,6 +18,7 @@ const (
 	ssGetSystems
 	ssGetTickets
 	ssGetVuln
+	ssGetVulns
 	ssGetVulnDates
 	ssGetVulnID
 	ssInsertAffected
@@ -54,6 +55,7 @@ var (
 		ssGetSystems:      "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
 		ssGetTickets:      "SELECT ticket FROM tickets WHERE vulnid=$1;",
 		ssGetVuln:         "SELECT cve, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
+		ssGetVulns:        "SELECT vulnid, vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:  "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
@@ -301,6 +303,7 @@ func DecommissionSystem(db *sql.DB, name string) error {
 	return nil
 }
 
+// GetExploit returns the row from the exploits table for the given vulnid.
 func GetExploit(vid int64) (sql.NullString, sql.NullBool, error) {
 	var exploit sql.NullString
 	var exploitable sql.NullBool
@@ -331,6 +334,7 @@ func GetTickets(vid int64) (*[]string, error) {
 	return execGetRowsStr(ssGetTickets, vid)
 }
 
+// GetVulnerability returns a Vulnerability object for the given vulnname.
 func GetVulnerability(vname string) (*Vulnerability, error) {
 	var vuln Vulnerability
 
@@ -378,6 +382,28 @@ func GetVulnerability(vname string) (*Vulnerability, error) {
 	vuln.Exploitable = exploitable
 
 	return &vuln, nil
+}
+
+// GetVulnerabilities returns a slice of pointers to Vulnerability objects. These objects will ONLY have the content from the vuln table
+// in them. The id can then be passed into the other GetXYZ functions to retrieve the other parts of the vulnerability.
+func GetVulnerabilities() ([]*Vulnerability, error) {
+	vulns := []*Vulnerability{}
+	rows, err := queries[ssGetVulns].Query()
+	if err != nil {
+		return vulns, newErrFromErr(err, "GetVulnerabilities")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v Vulnerability
+		if err := rows.Scan(&v.ID, &v.Name, &v.Cve, &v.Finder, &v.Initiator, &v.Summary, &v.Test, &v.Mitigation); err != nil {
+			return vulns, newErrFromErr(err, "GetVulnerabilities", "row.Scan")
+		}
+		vulns = append(vulns, &v)
+	}
+	if err := rows.Err(); err != nil {
+		return vulns, newErrFromErr(err, "GetVulnerabilities")
+	}
+	return vulns, nil
 }
 
 // GetVulnDates returns a VulnDates object with the dates row associated with the vulnid.
@@ -585,7 +611,7 @@ func execGetRowsStr(ss sqlStatement, args ...interface{}) (*[]string, error) {
 	for rows.Next() {
 		var r string
 		if err := rows.Scan(&r); err != nil {
-			return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr", "rows.scan")
+			return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr", "rows.Scan")
 		}
 		res = append(res, r)
 	}
@@ -606,7 +632,7 @@ func execGetRowsSys(ss sqlStatement, args ...interface{}) (*[]System, error) {
 	for rows.Next() {
 		var r System
 		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.OpSys, &r.Location, &r.Description); err != nil {
-			return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.scan")
+			return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.Scan")
 		}
 		res = append(res, r)
 	}
