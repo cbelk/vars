@@ -88,7 +88,9 @@ func IsNoRowsError(err error) bool {
 // IsNilErr type asserts the provided error (error, Err, Errs) and returns true if the error is nil,
 // false otherwise.
 func IsNilErr(e interface{}) bool {
-	if ve, ok := e.(Err); ok {
+	if e == nil {
+		return true
+	} else if ve, ok := e.(Err); ok {
 		return ve.err == nil
 	} else if ves, ok := e.(Errs); ok {
 		if len(ves) == 0 {
