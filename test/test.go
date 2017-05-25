@@ -94,6 +94,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = testGetVulnerabilities()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Done!")
 }
 
@@ -101,10 +106,50 @@ func testGetVulnerability(vname string) error {
 	fmt.Printf("vname is %v\n\n", vname)
 	vuln, err := vars.GetVulnerability(vname)
 	if !vars.IsNilErr(err) {
-		fmt.Println("Error in testGetVulnerability")
 		return err
 	}
 	fmt.Println(vuln)
+	return nil
+}
+
+func testGetVulnerabilities() error {
+	vulns, err := vars.GetVulnerabilities()
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, vuln := range vulns {
+
+		// Get dates
+		vd, err := vars.GetVulnDates(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		vuln.Dates = *vd
+
+		// Get tickets
+		ticks, err := vars.GetTickets(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		vuln.Tickets = *ticks
+
+		// Get references
+		refs, err := vars.GetReferences(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		vuln.References = *refs
+
+		// Get exploit
+		exploit, exploitable, err := vars.GetExploit(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		vuln.Exploit = exploit
+		vuln.Exploitable = exploitable
+
+		fmt.Printf("Vulnerability:\n%v\n", *vuln)
+	}
 	return nil
 }
 
