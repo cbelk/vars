@@ -41,6 +41,7 @@ const (
 	ssUpdatePubDate
 	ssUpdateRefers
 	ssUpdateTicket
+	ssUpdateVulnName
 )
 
 // SQL queries to be used in program execution.
@@ -54,7 +55,7 @@ var (
 		ssGetReferences:   "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystems:      "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
 		ssGetTickets:      "SELECT ticket FROM tickets WHERE vulnid=$1;",
-		ssGetVuln:         "SELECT cve, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
+		ssGetVuln:         "SELECT vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
 		ssGetVulns:        "SELECT vulnid, vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln;",
 		ssGetVulnDates:    "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
@@ -78,6 +79,7 @@ var (
 		ssUpdatePubDate:   "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 		ssUpdateRefers:    "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
 		ssUpdateTicket:    "UPDATE tickets SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
+		ssUpdateVulnName:  "UPDATE vuln SET vulnname=$1 WHERE vulnid=$2;",
 	}
 	execNames = map[sqlStatement]string{
 		ssGetExploit:      "GetExploit",
@@ -102,6 +104,7 @@ var (
 		ssUpdatePubDate:   "UpdatePubDate",
 		ssUpdateRefers:    "UpdateRefers",
 		ssUpdateTicket:    "UpdateTicket",
+		ssUpdateVulnName:  "UpdateVulnName",
 	}
 )
 
@@ -334,47 +337,41 @@ func GetTickets(vid int64) (*[]string, error) {
 	return execGetRowsStr(ssGetTickets, vid)
 }
 
-// GetVulnerability returns a Vulnerability object for the given vulnname.
-func GetVulnerability(vname string) (*Vulnerability, error) {
+// GetVulnerability returns a Vulnerability object for the given vulnid.
+func GetVulnerability(vid int64) (*Vulnerability, error) {
 	var vuln Vulnerability
 
-	// Get vulnid
-	id, err := GetVulnID(vname)
-	if !IsNilErr(err) {
-		return &vuln, err
-	}
-	vuln.ID = id
-	vuln.Name = vname
+	vuln.ID = vid
 
 	// Get vuln fields
-	err = queries[ssGetVuln].QueryRow(id).Scan(&vuln.Cve, &vuln.Finder, &vuln.Initiator, &vuln.Summary, &vuln.Test, &vuln.Mitigation)
+	err := queries[ssGetVuln].QueryRow(vid).Scan(&vuln.Name, &vuln.Cve, &vuln.Finder, &vuln.Initiator, &vuln.Summary, &vuln.Test, &vuln.Mitigation)
 	if err != nil {
 		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
 
 	// Get dates
-	vd, err := GetVulnDates(id)
+	vd, err := GetVulnDates(vid)
 	if !IsNilErr(err) {
 		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
 	vuln.Dates = *vd
 
 	// Get tickets
-	ticks, err := GetTickets(id)
+	ticks, err := GetTickets(vid)
 	if !IsNilErr(err) {
 		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
 	vuln.Tickets = *ticks
 
 	// Get references
-	refs, err := GetReferences(id)
+	refs, err := GetReferences(vid)
 	if !IsNilErr(err) {
 		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
 	vuln.References = *refs
 
 	// Get exploit
-	exploit, exploitable, err := GetExploit(id)
+	exploit, exploitable, err := GetExploit(vid)
 	if !IsNilErr(err) {
 		return &vuln, newErrFromErr(err, "GetVulnerability")
 	}
@@ -585,6 +582,11 @@ func UpdateRefers(tx *sql.Tx, vid int64, oldURL, newURL string) Err {
 // UpdateTicket will update the ticket associated with the (vid, oldTicket) row to newTicket.
 func UpdateTicket(tx *sql.Tx, vid int64, oldTicket, newTicket string) Err {
 	return execMutation(tx, ssUpdateTicket, newTicket, vid, oldTicket)
+}
+
+// UpdateVulnName will update the vulnerability's name.
+func UpdateVulnName(tx *sql.Tx, vid int64, vname string) Err {
+	return execMutation(tx, ssUpdateVulnName, vname, vid)
 }
 
 // execMutation executes the query referenced by ss in the queries map and returns any errors.
