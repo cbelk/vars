@@ -129,19 +129,19 @@ type System struct {
 
 // VulnDates holds the different dates relating to the vulnerability.
 type VulnDates struct {
-	Published sql.NullString // Date the vulnerability was made public
+	Published VarsNullString // Date the vulnerability was made public
 	Initiated string         // Date the vulnerability assessment was started
-	Mitigated sql.NullString // Date the vulnerability was mitigated on all systems
+	Mitigated VarsNullString // Date the vulnerability was mitigated on all systems
 }
 
 // Vulnerability holds information about a discovered vulnerability and the vulnerability assessment.
 type Vulnerability struct {
 	ID          int64
 	Name        string
-	Cve         sql.NullString
+	Cve         VarsNullString
 	Cvss        float32        // CVSS score
 	CorpScore   float32        // Calculated corporate score
-	CvssLink    sql.NullString // Link to CVSS scoresheet
+	CvssLink    VarsNullString // Link to CVSS scoresheet
 	Finder      int            // Employee that found the vulnerability
 	Initiator   int            // Employee that started the vulnerability assessment
 	Summary     string
@@ -150,8 +150,8 @@ type Vulnerability struct {
 	Dates       VulnDates      // The dates associated with the vulnerability
 	Tickets     []string       // Tickets relating to the vulnerability
 	References  []string       // Reference URLs
-	Exploit     sql.NullString // Exploit for the vulnerability
-	Exploitable sql.NullBool   // Are there currently exploits for the vulnerability
+	Exploit     VarsNullString // Exploit for the vulnerability
+	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
 }
 
 // AddSystem inserts a new systems into the VARS database.
@@ -179,7 +179,7 @@ func AddEmployee(db *sql.DB, emp *Employee) error {
 }
 
 // AddVulnerability starts a new vulnerability assessment by inserting a new vulnerability.
-func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
+func AddVulnerability(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 
 	// Check if vulnerability name is available
@@ -199,16 +199,18 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 	}
 	vuln.ID = id
 
-	tx, err := db.Begin()
-	if err != nil {
-		return newErrFromErr(err, "AddVulnerability")
-	}
-	rollback := true
-	defer func() {
-		if rollback {
-			tx.Rollback()
+	/*
+		tx, err := db.Begin()
+		if err != nil {
+			return newErrFromErr(err, "AddVulnerability")
 		}
-	}()
+		rollback := true
+		defer func() {
+			if rollback {
+				tx.Rollback()
+			}
+		}()
+	*/
 
 	var e interface{}
 
@@ -287,10 +289,12 @@ func AddVulnerability(db *sql.DB, vuln *Vulnerability) error {
 		}
 	}
 
-	rollback = false
-	if e := tx.Commit(); e != nil {
-		errs.appendFromError(e, "AddVulnerability")
-	}
+	/*
+		rollback = false
+		if e := tx.Commit(); e != nil {
+			errs.appendFromError(e, "AddVulnerability")
+		}
+	*/
 	return errs
 }
 
@@ -307,9 +311,9 @@ func DecommissionSystem(db *sql.DB, name string) error {
 }
 
 // GetExploit returns the row from the exploits table for the given vulnid.
-func GetExploit(vid int64) (sql.NullString, sql.NullBool, error) {
-	var exploit sql.NullString
-	var exploitable sql.NullBool
+func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
+	var exploit VarsNullString
+	var exploitable VarsNullBool
 	err := queries[ssGetExploit].QueryRow(vid).Scan(&exploitable, &exploit)
 	if err != nil && err != sql.ErrNoRows {
 		return exploit, exploitable, newErrFromErr(err, "GetExploit")
@@ -429,12 +433,12 @@ func InsertAffected(tx *sql.Tx, vid int64, sid int) Err {
 }
 
 // InsertDates inserts the dates published, initiated, and mitigated.
-func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit sql.NullString) error {
+func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) error {
 	return execMutation(tx, ssInsertDates, vid, pub, ini, mit)
 }
 
 // InsertImpact inserts the dates published, initiated, and mitigated.
-func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink sql.NullString) error {
+func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink VarsNullString) error {
 	return execMutation(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
 }
 
