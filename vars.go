@@ -154,18 +154,6 @@ type Vulnerability struct {
 	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
 }
 
-// AddSystem inserts a new systems into the VARS database.
-func AddSystem(db *sql.DB, sys *System) error {
-	res, err := queries[ssInsertSystem].Exec(sys.Name, sys.Type, sys.OpSys, sys.Location, sys.Description, "active")
-	if rows, _ := res.RowsAffected(); rows < 1 {
-		return newErr(noRowsInserted, "AddSystem")
-	}
-	if err != nil {
-		return newErrFromErr(err, "AddSystem")
-	}
-	return nil
-}
-
 // AddEmployee inserts a new employee into the VARS database.
 func AddEmployee(db *sql.DB, emp *Employee) error {
 	res, err := queries[ssInsertEmployee].Exec(emp.FirstName, emp.LastName, emp.Email)
@@ -299,15 +287,8 @@ func AddVulnerability(tx *sql.Tx, vuln *Vulnerability) error {
 }
 
 // DecommissionSystem updates the system table to reflect a decommissioned system.
-func DecommissionSystem(db *sql.DB, name string) error {
-	res, err := queries[ssDecomSystem].Exec(name)
-	if rows, _ := res.RowsAffected(); rows < 1 {
-		return newErr(noRowsUpdated, "DecommissionSystem")
-	}
-	if err != nil {
-		return newErrFromErr(err, "DecommissionSystem")
-	}
-	return nil
+func DecommissionSystem(tx *sql.Tx, name string) Err {
+	return execMutation(tx, ssDecomSystem, name)
 }
 
 // GetExploit returns the row from the exploits table for the given vulnid.
@@ -445,6 +426,11 @@ func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink VarsN
 // InsertRef will insert a new row into the ref table with key (vid, url).
 func InsertRef(tx *sql.Tx, vid int64, url string) Err {
 	return execMutation(tx, ssInsertRefers, vid, url)
+}
+
+// InsertSystem will add a new system to the database.
+func InsertSystem(tx *sql.Tx, sys *System) Err {
+	return execMutation(tx, ssInsertSystem, sys.Name, sys.Type, sys.OpSys, sys.Location, sys.Description, "active")
 }
 
 // InsertTicket will insert a new row into the ticket table with key (vid, ticket).
