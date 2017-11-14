@@ -178,16 +178,10 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	}()
 
 	// Decommission system
-	log.Print("DecommissionSystem: Decommissioning sys")
-	err = vars.DecommissionSystem(tx, sys.Name)
-	if ve, ok := err.(vars.Err); ok {
-		if !vars.IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
-			}
-		}
-	} else if e, ok := err.(error); ok {
-		return e
+	log.Print("DecommissionSystem: Decommissioning ", sys)
+	err = vars.UpdateSysState(tx, sys.ID, "decommissioned")
+	if !vars.IsNilErr(err) {
+		return err
 	}
 
 	// Commit the transaction
