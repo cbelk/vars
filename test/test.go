@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/cbelk/vars"
+	"github.com/cbelk/vars/pkg/varsapi"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it"},
 	}
 	vulns = []vars.Vulnerability{
-		{Name: "DirtyCOW", Cve: sql.NullString{String: "CVE-2016-5195", Valid: true}, Cvss: 7.8, CorpScore: 8, CvssLink: sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: sql.NullString{String: "11/10/2016", Valid: true}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}, Exploitable: sql.NullBool{Bool: true, Valid: true}},
+		{Name: "DirtyCOW", Cve: vars.VarsNullString{sql.NullString{String: "CVE-2016-5195", Valid: true}}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
 		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/1/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
 	}
 )
@@ -67,7 +68,7 @@ func main() {
 	// Test decomissioning a system
 	s := 2
 	fmt.Println("Decomissioning system ", systems[s].Name, "\n")
-	err = testDecomSystem(db, s)
+	err = testDecomSystem(db, systems[s])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,7 +105,11 @@ func main() {
 
 func testGetVulnerability(vname string) error {
 	fmt.Printf("vname is %v\n\n", vname)
-	vuln, err := vars.GetVulnerability(vname)
+	vid, err := vars.GetVulnID(vname)
+	if err != nil {
+		return err
+	}
+	vuln, err := vars.GetVulnerability(vid)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -155,7 +160,7 @@ func testGetVulnerabilities() error {
 
 func testAddSystems(db *sql.DB) error {
 	for _, v := range systems {
-		err := vars.AddSystem(db, &v)
+		err := varsapi.AddSystem(db, &v)
 		if err != nil {
 			return err
 		}
@@ -173,9 +178,9 @@ func testAddEmps(db *sql.DB) error {
 	return nil
 }
 
-func testDecomSystem(db *sql.DB, stms ...int) error {
+func testDecomSystem(db *sql.DB, stms ...vars.System) error {
 	for _, v := range stms {
-		err := vars.DecommissionSystem(db, systems[v].Name)
+		err := varsapi.DecommissionSystem(db, &v)
 		if err != nil {
 			return err
 		}
@@ -196,7 +201,7 @@ func testGetActiveSystems() error {
 
 func testAddVulnerabilities(db *sql.DB) error {
 	for _, v := range vulns {
-		err := vars.AddVulnerability(db, &v)
+		err := varsapi.AddVulnerability(db, &v)
 		if !vars.IsNilErr(err) {
 			return err
 		}
