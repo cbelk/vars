@@ -12,7 +12,6 @@ type sqlStatement int
 const (
 	ssActiveSystems sqlStatement = iota
 	ssCheckName
-	ssDecomSystem
 	ssGetExploit
 	ssGetReferences
 	ssGetSystem
@@ -42,6 +41,12 @@ const (
 	ssUpdateMitDate
 	ssUpdatePubDate
 	ssUpdateRefers
+	ssUpdateSysName
+	ssUpdateSysType
+	ssUpdateSysOS
+	ssUpdateSysLoc
+	ssUpdateSysDesc
+	ssUpdateSysState
 	ssUpdateTicket
 	ssUpdateVulnName
 )
@@ -52,7 +57,6 @@ var (
 	queryStrings = map[sqlStatement]string{
 		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
 		ssCheckName:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
-		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetExploit:      "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:   "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:       "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -82,6 +86,12 @@ var (
 		ssUpdateMitDate:   "UPDATE dates SET mitigated=$1 WHERE vulnid=$2;",
 		ssUpdatePubDate:   "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 		ssUpdateRefers:    "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
+		ssUpdateSysName:   "UPDATE systems SET sysname=$1 WHERE sysid=$2;",
+		ssUpdateSysType:   "UPDATE systems SET systype=$1 WHERE sysid=$2;",
+		ssUpdateSysOS:     "UPDATE systems SET opsys=$1 WHERE sysid=$2;",
+		ssUpdateSysLoc:    "UPDATE systems SET location=$1 WHERE sysid=$2;",
+		ssUpdateSysDesc:   "UPDATE systems SET description=$1 WHERE sysid=$2;",
+		ssUpdateSysState:  "UPDATE systems SET state=$1 WHERE sysid=$2;",
 		ssUpdateTicket:    "UPDATE tickets SET ticket=$1 WHERE vulnid=$2 AND ticket=$3;",
 		ssUpdateVulnName:  "UPDATE vuln SET vulnname=$1 WHERE vulnid=$2;",
 	}
@@ -109,6 +119,12 @@ var (
 		ssUpdateMitDate:   "UpdateMitDate",
 		ssUpdatePubDate:   "UpdatePubDate",
 		ssUpdateRefers:    "UpdateRefers",
+		ssUpdateSysName:   "UpdateSysName",
+		ssUpdateSysType:   "UpdateSysType",
+		ssUpdateSysOS:     "UpdateSysOS",
+		ssUpdateSysLoc:    "UpdateSysLoc",
+		ssUpdateSysDesc:   "UpdateSysDesc",
+		ssUpdateSysState:  "UpdateSysState",
 		ssUpdateTicket:    "UpdateTicket",
 		ssUpdateVulnName:  "UpdateVulnName",
 	}
@@ -170,11 +186,6 @@ func AddEmployee(db *sql.DB, emp *Employee) error {
 		return newErrFromErr(err, "AddEmployee")
 	}
 	return nil
-}
-
-// DecommissionSystem updates the system table to reflect a decommissioned system.
-func DecommissionSystem(tx *sql.Tx, name string) Err {
-	return execMutation(tx, ssDecomSystem, name)
 }
 
 // GetExploit returns the row from the exploits table for the given vulnid.
@@ -494,6 +505,36 @@ func UpdatePubDate(tx *sql.Tx, vid int64, pubDate string) Err {
 // UpdateRefers will update the url associated with the (vid, oldURL) row to newURL.
 func UpdateRefers(tx *sql.Tx, vid int64, oldURL, newURL string) Err {
 	return execMutation(tx, ssUpdateRefers, newURL, vid, oldURL)
+}
+
+// UpdateSysName will update the name associated with the sysid.
+func UpdateSysName(tx *sql.Tx, sid int64, name string) Err {
+	return execMutation(tx, ssUpdateSysName, name, sid)
+}
+
+// UpdateSysType will update the type associated with the sysid.
+func UpdateSysType(tx *sql.Tx, sid int64, stype string) Err {
+	return execMutation(tx, ssUpdateSysType, stype, sid)
+}
+
+// UpdateSysOS will update the OS associated with the sysid.
+func UpdateSysOS(tx *sql.Tx, sid int64, os string) Err {
+	return execMutation(tx, ssUpdateSysOS, os, sid)
+}
+
+// UpdateSysLoc will update the location associated with the sysid.
+func UpdateSysLoc(tx *sql.Tx, sid int64, loc string) Err {
+	return execMutation(tx, ssUpdateSysLoc, loc, sid)
+}
+
+// UpdateSysDesc will update the description associated with the sysid.
+func UpdateSysDesc(tx *sql.Tx, sid int64, desc string) Err {
+	return execMutation(tx, ssUpdateSysDesc, desc, sid)
+}
+
+// UpdateSysState will update the state associated with the sysid.
+func UpdateSysState(tx *sql.Tx, sid int64, state string) Err {
+	return execMutation(tx, ssUpdateSysState, state, sid)
 }
 
 // UpdateTicket will update the ticket associated with the (vid, oldTicket) row to newTicket.
