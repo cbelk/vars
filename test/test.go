@@ -66,7 +66,7 @@ func main() {
 	}
 
 	// Test decomissioning a system
-	s := 2
+	s := 1
 	fmt.Println("Decomissioning system ", systems[s].Name, "\n")
 	err = testDecomSystem(db, systems[s])
 	if err != nil {
@@ -88,14 +88,47 @@ func main() {
 	}
 
 	// Test getting vulnerabilities
-	v := 1
-	fmt.Println("Vulnerability is:")
-	err = testGetVulnerability(vulns[v].Name)
+	v0, err := testGetVulnerability(vulns[0].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Retrieving vulnerability 0")
+	fmt.Println(v0)
+
+	v1, err := testGetVulnerability(vulns[1].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Retrieving vulnerability 1")
+	fmt.Println(v1)
+
+	err = testGetVulnerabilities()
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
 
-	err = testGetVulnerabilities()
+	// Test getting systems
+	s0, err := testGetSystem(systems[0].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Retrieving system 0")
+	fmt.Println(s0)
+
+	s2, err := testGetSystem(systems[2].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Retrieving system 2")
+	fmt.Println(s2)
+
+	// Test adding affected systems
+	fmt.Println("Adding affected systems ...\n\n")
+	err = testAddAffected(db, v0, s0)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	err = testAddAffected(db, v1, s2)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
@@ -103,18 +136,89 @@ func main() {
 	fmt.Println("Done!")
 }
 
-func testGetVulnerability(vname string) error {
-	fmt.Printf("vname is %v\n\n", vname)
-	vid, err := vars.GetVulnID(vname)
+func testAddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
+	fmt.Printf("Adding vulnid %v sysid %v\n", vuln.ID, sys.ID)
+	return varsapi.AddAffected(db, vuln, sys)
+}
+
+func testAddEmps(db *sql.DB) error {
+	for _, v := range emps {
+		err := vars.AddEmployee(db, &v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func testAddSystems(db *sql.DB) error {
+	for _, v := range systems {
+		err := varsapi.AddSystem(db, &v)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Added system: ", v)
+	}
+	return nil
+}
+
+func testAddVulnerabilities(db *sql.DB) error {
+	for _, v := range vulns {
+		err := varsapi.AddVulnerability(db, &v)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func testDecomSystem(db *sql.DB, stms ...vars.System) error {
+	for _, v := range stms {
+		err := varsapi.DecommissionSystem(db, &v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func testGetActiveSystems() error {
+	syss, err := vars.GetActiveSystems()
 	if err != nil {
 		return err
 	}
+	for _, sys := range *syss {
+		fmt.Println(sys, "\n")
+	}
+	return nil
+}
+
+func testGetSystem(sysname string) (*vars.System, error) {
+	fmt.Printf("sysname is %v\n\n", sysname)
+	var s vars.System
+	sid, err := vars.GetSystemID(sysname)
+	if err != nil {
+		return &s, err
+	}
+	sys, err := vars.GetSystem(sid)
+	if err != nil {
+		return &s, err
+	}
+	return sys, nil
+}
+
+func testGetVulnerability(vname string) (*vars.Vulnerability, error) {
+	fmt.Printf("vname is %v\n\n", vname)
+	var v vars.Vulnerability
+	vid, err := vars.GetVulnID(vname)
+	if err != nil {
+		return &v, err
+	}
 	vuln, err := vars.GetVulnerability(vid)
 	if !vars.IsNilErr(err) {
-		return err
+		return &v, err
 	}
-	fmt.Println(vuln)
-	return nil
+	return vuln, nil
 }
 
 func testGetVulnerabilities() error {
@@ -154,57 +258,6 @@ func testGetVulnerabilities() error {
 		vuln.Exploitable = exploitable
 
 		fmt.Printf("Vulnerability:\n%v\n", *vuln)
-	}
-	return nil
-}
-
-func testAddSystems(db *sql.DB) error {
-	for _, v := range systems {
-		err := varsapi.AddSystem(db, &v)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func testAddEmps(db *sql.DB) error {
-	for _, v := range emps {
-		err := vars.AddEmployee(db, &v)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func testDecomSystem(db *sql.DB, stms ...vars.System) error {
-	for _, v := range stms {
-		err := varsapi.DecommissionSystem(db, &v)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func testGetActiveSystems() error {
-	syss, err := vars.GetActiveSystems()
-	if err != nil {
-		return err
-	}
-	for _, sys := range *syss {
-		fmt.Println(sys, "\n")
-	}
-	return nil
-}
-
-func testAddVulnerabilities(db *sql.DB) error {
-	for _, v := range vulns {
-		err := varsapi.AddVulnerability(db, &v)
-		if !vars.IsNilErr(err) {
-			return err
-		}
 	}
 	return nil
 }

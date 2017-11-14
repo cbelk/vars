@@ -11,6 +11,37 @@ import (
 	"github.com/cbelk/vars"
 )
 
+// AddAffected adds a new vulnerability/system pair to the affected table
+func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
+	//Start transaction and set rollback function
+	log.Print("AddSystem: Starting transaction")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Add affected
+	log.Print("AddAffected: Adding affected system")
+	err = vars.InsertAffected(tx, vuln.ID, sys.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	log.Print("AddAffected: Committing transaction")
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // AddSystem adds a new system to the database.
 func AddSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
@@ -38,6 +69,13 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	} else if e, ok := err.(error); ok {
 		return e
 	}
+
+	// Update the sysid
+	id, err := vars.GetSystemIDtx(tx, sys.Name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	sys.ID = id
 
 	// Commit the transaction
 	log.Print("AddSystem: Committing transaction")

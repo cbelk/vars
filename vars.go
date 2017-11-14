@@ -15,7 +15,9 @@ const (
 	ssDecomSystem
 	ssGetExploit
 	ssGetReferences
+	ssGetSystem
 	ssGetSystems
+	ssGetSystemID
 	ssGetTickets
 	ssGetVuln
 	ssGetVulns
@@ -53,7 +55,9 @@ var (
 		ssDecomSystem:     "UPDATE systems SET state='decommissioned' WHERE sysname=$1;",
 		ssGetExploit:      "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:   "SELECT url FROM ref WHERE vulnid=$1;",
+		ssGetSystem:       "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
 		ssGetSystems:      "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
+		ssGetSystemID:     "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssGetTickets:      "SELECT ticket FROM tickets WHERE vulnid=$1;",
 		ssGetVuln:         "SELECT vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
 		ssGetVulns:        "SELECT vulnid, vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln;",
@@ -84,7 +88,9 @@ var (
 	execNames = map[sqlStatement]string{
 		ssGetExploit:      "GetExploit",
 		ssGetReferences:   "GetReferences",
+		ssGetSystem:       "GetSystem",
 		ssGetSystems:      "GetSystems",
+		ssGetSystemID:     "GetSystemID",
 		ssGetTickets:      "GetTickets",
 		ssInsertAffected:  "InsertAffected",
 		ssInsertDates:     "InsertDates",
@@ -316,9 +322,40 @@ func GetReferences(vid int64) (*[]string, error) {
 	return execGetRowsStr(ssGetReferences, vid)
 }
 
+// GetSystem returns a system struct matching the given systemID.
+func GetSystem(sid int64) (*System, error) {
+	var sys System
+	sys.ID = sid
+	err := queries[ssGetSystem].QueryRow(sid).Scan(&sys.Name, &sys.Type, &sys.OpSys, &sys.Location, &sys.Description, &sys.State)
+	if err != nil && err != sql.ErrNoRows {
+		return &sys, newErrFromErr(err, "GetSystem")
+	}
+	return &sys, nil
+}
+
 // GetSystems returns a pointer to a slice of System types representing all systems.
 func GetSystems() (*[]System, error) {
 	return execGetRowsSys(ssGetSystems)
+}
+
+// GetSystemID returns the vulnid associated with the vname.
+func GetSystemID(sysname string) (int64, error) {
+	var id int64
+	err := queries[ssGetSystemID].QueryRow(sysname).Scan(&id)
+	if err != nil {
+		return id, newErrFromErr(err, "GetSystemID")
+	}
+	return id, nil
+}
+
+// GetSystemIDtx returns the vulnid associated with the vname.
+func GetSystemIDtx(tx *sql.Tx, sysname string) (int64, error) {
+	var id int64
+	err := tx.Stmt(queries[ssGetSystemID]).QueryRow(sysname).Scan(&id)
+	if err != nil {
+		return id, newErrFromErr(err, "GetSystemIDtx")
+	}
+	return id, nil
 }
 
 // GetTickets returns a spointer to a lice of tickets associated with the vulnid.
@@ -413,7 +450,7 @@ func GetVulnID(vname string) (int64, error) {
 }
 
 // InsertAffected will insert a new row into the affected table with key (vid, sid).
-func InsertAffected(tx *sql.Tx, vid int64, sid int) Err {
+func InsertAffected(tx *sql.Tx, vid, sid int64) Err {
 	return execMutation(tx, ssInsertAffected, vid, sid)
 }
 
