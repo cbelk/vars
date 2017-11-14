@@ -8,7 +8,8 @@
 *.exe
 # Ignore Mac DS_Store
 .DS_Store
-tmp/*
 vendor/*/
 # Ignore swap files
 *.swp
+# Ignore tmp directory
+tmp/**
