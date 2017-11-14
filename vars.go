@@ -171,21 +171,23 @@ func AddVulnerability(tx *sql.Tx, vuln *Vulnerability) error {
 	var errs Errs
 
 	// Check if vulnerability name is available
-	a, er := NameIsAvailable(vuln.Name)
-	if er != nil {
-		return newErrFromErr(er, "AddVulnerability")
-	}
-	if !a {
-		return newErr(nameNotAvailable, "AddVulnerability")
-	}
+	/*
+		a, er := NameIsAvailable(vuln.Name)
+		if er != nil {
+			return newErrFromErr(er, "AddVulnerability")
+		}
+		if !a {
+			return newErr(nameNotAvailable, "AddVulnerability")
+		}
 
-	// Setting values in the vuln table
-	var id int64
-	err := queries[ssInsertVuln].QueryRow(vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation).Scan(&id)
-	if err != nil {
-		return newErrFromErr(err, "AddVulnerability", "ssInsertVuln")
-	}
-	vuln.ID = id
+		// Setting values in the vuln table
+		var id int64
+		err := queries[ssInsertVuln].QueryRow(vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation).Scan(&id)
+		if err != nil {
+			return newErrFromErr(err, "AddVulnerability", "ssInsertVuln")
+		}
+		vuln.ID = id
+	*/
 
 	/*
 		tx, err := db.Begin()
@@ -200,82 +202,84 @@ func AddVulnerability(tx *sql.Tx, vuln *Vulnerability) error {
 		}()
 	*/
 
-	var e interface{}
+	//	var e interface{}
 
 	// Setting values in the impact table
-	e = InsertImpact(tx, vuln.ID, vuln.Cvss, vuln.CorpScore, vuln.CvssLink)
-	if ve, ok := e.(Err); ok {
-		if !IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
+	/*
+		e = InsertImpact(tx, vuln.ID, vuln.Cvss, vuln.CorpScore, vuln.CvssLink)
+		if ve, ok := e.(Err); ok {
+			if !IsNilErr(ve) {
+				if !ve.IsNoRowsError() {
+					return ve
+				}
+				errs.appendFromError(ve, "AddVulnerability")
 			}
-			errs.appendFromError(ve, "AddVulnerability")
+		} else if ves, ok := e.(Errs); ok {
+			if !IsNilErr(ves) {
+				errs.appendFromErrs(ves)
+			}
 		}
-	} else if ves, ok := e.(Errs); ok {
-		if !IsNilErr(ves) {
-			errs.appendFromErrs(ves)
-		}
-	}
 
-	// Setting values in the dates table
-	e = InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
-	if ve, ok := e.(Err); ok {
-		if !IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
+		// Setting values in the dates table
+		e = InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
+		if ve, ok := e.(Err); ok {
+			if !IsNilErr(ve) {
+				if !ve.IsNoRowsError() {
+					return ve
+				}
+				errs.appendFromError(ve, "AddVulnerability")
 			}
-			errs.appendFromError(ve, "AddVulnerability")
+		} else if ves, ok := e.(Errs); ok {
+			if !IsNilErr(ves) {
+				errs.appendFromErrs(ves)
+			}
 		}
-	} else if ves, ok := e.(Errs); ok {
-		if !IsNilErr(ves) {
-			errs.appendFromErrs(ves)
-		}
-	}
 
-	// Setting values in the tickets table
-	e = SetTickets(tx, vuln)
-	if ve, ok := e.(Err); ok {
-		if !IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
+		// Setting values in the tickets table
+		e = SetTickets(tx, vuln)
+		if ve, ok := e.(Err); ok {
+			if !IsNilErr(ve) {
+				if !ve.IsNoRowsError() {
+					return ve
+				}
+				errs.appendFromError(ve, "AddVulnerability")
 			}
-			errs.appendFromError(ve, "AddVulnerability")
+		} else if ves, ok := e.(Errs); ok {
+			if !IsNilErr(ves) {
+				errs.appendFromErrs(ves)
+			}
 		}
-	} else if ves, ok := e.(Errs); ok {
-		if !IsNilErr(ves) {
-			errs.appendFromErrs(ves)
-		}
-	}
 
-	// Setting values in the ref table
-	e = SetReferences(tx, vuln)
-	if ve, ok := e.(Err); ok {
-		if !IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
+		// Setting values in the ref table
+		e = SetReferences(tx, vuln)
+		if ve, ok := e.(Err); ok {
+			if !IsNilErr(ve) {
+				if !ve.IsNoRowsError() {
+					return ve
+				}
+				errs.appendFromError(ve, "AddVulnerability")
 			}
-			errs.appendFromError(ve, "AddVulnerability")
+		} else if ves, ok := e.(Errs); ok {
+			if !IsNilErr(ves) {
+				errs.appendFromErrs(ves)
+			}
 		}
-	} else if ves, ok := e.(Errs); ok {
-		if !IsNilErr(ves) {
-			errs.appendFromErrs(ves)
-		}
-	}
 
-	// Setting values in the exploits table
-	e = SetExploit(tx, vuln)
-	if ve, ok := e.(Err); ok {
-		if !IsNilErr(ve) {
-			if !ve.IsNoRowsError() {
-				return ve
+		// Setting values in the exploits table
+		e = SetExploit(tx, vuln)
+		if ve, ok := e.(Err); ok {
+			if !IsNilErr(ve) {
+				if !ve.IsNoRowsError() {
+					return ve
+				}
+				errs.appendFromError(ve, "AddVulnerability")
 			}
-			errs.appendFromError(ve, "AddVulnerability")
+		} else if ves, ok := e.(Errs); ok {
+			if !IsNilErr(ves) {
+				errs.appendFromErrs(ves)
+			}
 		}
-	} else if ves, ok := e.(Errs); ok {
-		if !IsNilErr(ves) {
-			errs.appendFromErrs(ves)
-		}
-	}
+	*/
 
 	/*
 		rollback = false
@@ -418,7 +422,7 @@ func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) err
 	return execMutation(tx, ssInsertDates, vid, pub, ini, mit)
 }
 
-// InsertImpact inserts the dates published, initiated, and mitigated.
+// InsertImpact inserts the CVSS score, Corpscore, and CVSSlink.
 func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink VarsNullString) error {
 	return execMutation(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
 }
@@ -441,6 +445,18 @@ func InsertTicket(tx *sql.Tx, vid int64, ticket string) Err {
 // InsertVulnerability will insert a new row into the vuln table.
 func InsertVulnerability(tx *sql.Tx, vname, cve string, finder, initiator int, summary, test, mitigation string) error {
 	return execMutation(tx, ssInsertVuln, vname, cve, finder, initiator, summary, test, mitigation)
+}
+
+// InsertVulnerabilitySetID will insert the vulnerability into the database and set the ID of the newly created vulnerability.
+func InsertVulnerabilitySetID(vuln *Vulnerability) Err {
+	var id int64
+	var e Err
+	err := queries[ssInsertVuln].QueryRow(vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation).Scan(&id)
+	if err != nil {
+		return newErrFromErr(err, "AddVulnerability", "ssInsertVuln")
+	}
+	vuln.ID = id
+	return e
 }
 
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,

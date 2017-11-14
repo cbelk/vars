@@ -12,7 +12,7 @@ import (
 )
 
 // AddSystem adds a new system to the database.
-func AddSystem(db *sql.DB, data []byte) error {
+func AddSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
 	log.Print("AddSystem: Starting transaction")
 	tx, err := db.Begin()
@@ -25,13 +25,6 @@ func AddSystem(db *sql.DB, data []byte) error {
 			tx.Rollback()
 		}
 	}()
-
-	// Get System object
-	log.Print("AddSystem: Making sys from json")
-	sys, err := makeSysFromJson(data)
-	if err != nil {
-		return err
-	}
 
 	// Add system
 	log.Print("AddSystem: Adding sys")
@@ -55,8 +48,77 @@ func AddSystem(db *sql.DB, data []byte) error {
 	return nil
 }
 
+// AddVulnerability starts a new VA
+func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
+	//Start transaction and set rollback function
+	log.Print("AddVulnerability: Starting transaction")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Check if vulnerability name is available
+	a, err := vars.NameIsAvailable(vuln.Name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	if !a {
+		return vars.ErrNameNotAvailable
+	}
+
+	// Insert the vulnerability into the database
+	err = vars.InsertVulnerabilitySetID(vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the impact table
+	err = vars.InsertImpact(tx, vuln.ID, vuln.Cvss, vuln.CorpScore, vuln.CvssLink)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the dates table
+	err = vars.InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the ticket table
+	err = vars.SetTickets(tx, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the reference table
+	err = vars.SetReferences(tx, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the exploits table
+	err = vars.SetExploit(tx, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	log.Print("AddVulnerability: Committing transaction")
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // DecommissionSystem sets the state of the given system to decommissioned.
-func DecommissionSystem(db *sql.DB, data []byte) error {
+func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
 	log.Print("DecommissionSystem: Starting transaction")
 	tx, err := db.Begin()
@@ -69,13 +131,6 @@ func DecommissionSystem(db *sql.DB, data []byte) error {
 			tx.Rollback()
 		}
 	}()
-
-	// Get System object
-	log.Print("DecommissionSystem: Making sys from json")
-	sys, err := makeSysFromJson(data)
-	if err != nil {
-		return err
-	}
 
 	// Decommission system
 	log.Print("DecommissionSystem: Decommissioning sys")
@@ -92,43 +147,6 @@ func DecommissionSystem(db *sql.DB, data []byte) error {
 
 	// Commit the transaction
 	log.Print("DecommissionSystem: Committing transaction")
-	rollback = false
-	if e := tx.Commit(); e != nil {
-		return e
-	}
-	return nil
-}
-
-func AddVulnerability(db *sql.DB, data []byte) error {
-	//Start transaction and set rollback function
-	log.Print("AddVulnerability: Starting transaction")
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	rollback := true
-	defer func() {
-		if rollback {
-			tx.Rollback()
-		}
-	}()
-
-	// Get Vulnerability object
-	log.Print("AddVulnerability: Making vuln from json")
-	vuln, err := makeVulnFromJson(data)
-	if err != nil {
-		return err
-	}
-
-	// Add vulnerability
-	log.Print("AddVulnerability: Adding vuln")
-	err = vars.AddVulnerability(tx, vuln)
-	if err != nil {
-		return err
-	}
-
-	// Commit the transaction
-	log.Print("AddVulnerability: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -187,16 +205,4 @@ func UpdateVulnerability(db *sql.DB, v url.Values) error {
 		return e
 	}
 	return nil
-}
-
-func makeSysFromJson(data []byte) (*vars.System, error) {
-	var sys vars.System
-	err := json.Unmarshal(data, &sys)
-	return &sys, err
-}
-
-func makeVulnFromJson(data []byte) (*vars.Vulnerability, error) {
-	var vuln vars.Vulnerability
-	err := json.Unmarshal(data, &vuln)
-	return &vuln, err
 }
