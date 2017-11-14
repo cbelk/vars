@@ -174,7 +174,12 @@ func testAddVulnerabilities(db *sql.DB) error {
 
 func testDecomSystem(db *sql.DB, stms ...vars.System) error {
 	for _, v := range stms {
-		err := varsapi.DecommissionSystem(db, &v)
+		sid, err := vars.GetSystemID(v.Name)
+		if err != nil {
+			return err
+		}
+		v.ID = sid
+		err = varsapi.DecommissionSystem(db, &v)
 		if err != nil {
 			return err
 		}
