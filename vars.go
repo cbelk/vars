@@ -214,7 +214,7 @@ func GetSystems() (*[]System, error) {
 	return execGetRowsSys(ssGetSystems)
 }
 
-// GetSystemID returns the vulnid associated with the vname.
+// GetSystemID returns the sysid associated with the sysname.
 func GetSystemID(sysname string) (int64, error) {
 	var id int64
 	err := queries[ssGetSystemID].QueryRow(sysname).Scan(&id)
@@ -224,7 +224,7 @@ func GetSystemID(sysname string) (int64, error) {
 	return id, nil
 }
 
-// GetSystemIDtx returns the vulnid associated with the vname.
+// GetSystemIDtx returns the sysid associated with the sysname.
 func GetSystemIDtx(tx *sql.Tx, sysname string) (int64, error) {
 	var id int64
 	err := tx.Stmt(queries[ssGetSystemID]).QueryRow(sysname).Scan(&id)
@@ -325,6 +325,16 @@ func GetVulnID(vname string) (int64, error) {
 	return id, nil
 }
 
+// GetVulnIDtx returns the vulnid associated with the vname.
+func GetVulnIDtx(tx *sql.Tx, vulnname string) (int64, error) {
+	var id int64
+	err := tx.Stmt(queries[ssGetVulnID]).QueryRow(vulnname).Scan(&id)
+	if err != nil {
+		return id, newErrFromErr(err, "GetVulnIDtx")
+	}
+	return id, nil
+}
+
 // InsertAffected will insert a new row into the affected table with key (vid, sid).
 func InsertAffected(tx *sql.Tx, vid, sid int64) Err {
 	return execMutation(tx, ssInsertAffected, vid, sid)
@@ -356,20 +366,8 @@ func InsertTicket(tx *sql.Tx, vid int64, ticket string) Err {
 }
 
 // InsertVulnerability will insert a new row into the vuln table.
-func InsertVulnerability(tx *sql.Tx, vname, cve string, finder, initiator int, summary, test, mitigation string) error {
+func InsertVulnerability(tx *sql.Tx, vname string, cve VarsNullString, finder, initiator int, summary, test, mitigation string) error {
 	return execMutation(tx, ssInsertVuln, vname, cve, finder, initiator, summary, test, mitigation)
-}
-
-// InsertVulnerabilitySetID will insert the vulnerability into the database and set the ID of the newly created vulnerability.
-func InsertVulnerabilitySetID(vuln *Vulnerability) Err {
-	var id int64
-	var e Err
-	err := queries[ssInsertVuln].QueryRow(vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation).Scan(&id)
-	if err != nil {
-		return newErrFromErr(err, "AddVulnerability", "ssInsertVuln")
-	}
-	vuln.ID = id
-	return e
 }
 
 // IsVulnOpen returns true if the Vulnerability associated with the passed ID is still open,

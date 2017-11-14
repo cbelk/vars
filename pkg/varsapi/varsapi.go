@@ -111,10 +111,17 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}
 
 	// Insert the vulnerability into the database
-	err = vars.InsertVulnerabilitySetID(vuln)
+	err = vars.InsertVulnerability(tx, vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation)
 	if !vars.IsNilErr(err) {
 		return err
 	}
+
+	// Update the vulnid
+	vid, err := vars.GetVulnIDtx(tx, vuln.Name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	vuln.ID = vid
 
 	// Insert the values in the impact table
 	err = vars.InsertImpact(tx, vuln.ID, vuln.Cvss, vuln.CorpScore, vuln.CvssLink)
