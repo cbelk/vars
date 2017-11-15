@@ -11,7 +11,8 @@ type sqlStatement int
 
 const (
 	ssActiveSystems sqlStatement = iota
-	ssCheckName
+	ssCheckVulnName
+	ssCheckSysName
 	ssGetExploit
 	ssGetReferences
 	ssGetSystem
@@ -56,7 +57,8 @@ var (
 	queries      map[sqlStatement]*sql.Stmt
 	queryStrings = map[sqlStatement]string{
 		ssActiveSystems:   "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
-		ssCheckName:       "SELECT vulnid FROM vuln WHERE vulnname=$1;",
+		ssCheckVulnName:   "SELECT vulnid FROM vuln WHERE vulnname=$1;",
+		ssCheckSysName:    "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssGetExploit:      "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:   "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:       "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -395,9 +397,25 @@ func IsVulnOpen(vid int64) (bool, error) {
 }
 
 // NameIsAvailable returns true if the vulnerability name is available, false otherwise.
-func NameIsAvailable(vname string) (bool, error) {
-	var vid int64
-	err := queries[ssCheckName].QueryRow(vname).Scan(&vid)
+func NameIsAvailable(obj interface{}) (bool, error) {
+	var id int64
+	var ss sqlStatement
+	var name string
+
+	// Get Type
+	switch o := obj.(type) {
+	case Vulnerability:
+		ss = ssCheckVulnName
+		name = o.Name
+	case System:
+		ss = ssCheckSysName
+		name = o.Name
+	default:
+		return false, newErr(unknownType, "NameIsAvailable")
+	}
+
+	// Execute query
+	err := queries[ss].QueryRow(name).Scan(&id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return true, nil

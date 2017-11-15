@@ -57,6 +57,15 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 		}
 	}()
 
+	// Check if system name is available
+	a, err := vars.NameIsAvailable(*sys)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	if !a {
+		return vars.ErrNameNotAvailable
+	}
+
 	// Add system
 	log.Print("AddSystem: Adding sys")
 	err = vars.InsertSystem(tx, sys)
@@ -102,7 +111,7 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}()
 
 	// Check if vulnerability name is available
-	a, err := vars.NameIsAvailable(vuln.Name)
+	a, err := vars.NameIsAvailable(*vuln)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -204,6 +213,10 @@ func GetVulnerability(id string) ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(vuln)
+}
+
+func UpdateSystem(db *sql.DB, sys *vars.System) error {
+	return nil
 }
 
 func UpdateVulnerability(db *sql.DB, v url.Values) error {

@@ -12,6 +12,7 @@ const (
 	noRowsInserted errType = iota
 	noRowsUpdated
 	nameNotAvailable
+	unknownType
 	genericVars
 )
 
@@ -22,6 +23,8 @@ var (
 	ErrNoRowsUpdated = errors.New("No rows were updated")
 	//ErrNameNotAvailable is used when the provided vulnnerability name is not available
 	ErrNameNotAvailable = errors.New("The provided vulnerability name is not available")
+	//ErrUknownType is used for the default case of the type switch
+	ErrUnknownType = errors.New("The interface type is not supported")
 	//ErrGenericVars is used when the error is too generic
 	ErrGenericVars = errors.New("Something went wrong")
 )
@@ -43,6 +46,8 @@ func newErr(errT errType, parents ...string) Err {
 		err.err = ErrNoRowsUpdated
 	case nameNotAvailable:
 		err.err = ErrNameNotAvailable
+	case unknownType:
+		err.err = ErrUnknownType
 	default:
 		err.err = ErrGenericVars
 	}
