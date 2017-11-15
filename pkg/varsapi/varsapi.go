@@ -202,20 +202,47 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
-/*
 // GetVulnerability retrieves/returns the vulnerability with the given id.
-func GetVulnerability(id string) ([]byte, error) {
-	vid, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return nil, err
-	}
+func GetVulnerability(vid int64) (*vars.Vulnerability, error) {
+	var v vars.Vulnerability
+
+	// Get vulnerability fields
 	vuln, err := vars.GetVulnerability(vid)
-	if err != nil {
-		return nil, err
+	if !vars.IsNilErr(err) {
+		return &v, err
 	}
-	return json.Marshal(vuln)
+
+	// Get dates
+	vd, err := vars.GetVulnDates(vid)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.Dates = *vd
+
+	// Get tickets
+	ticks, err := vars.GetTickets(vid)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.Tickets = *ticks
+
+	// Get references
+	refs, err := vars.GetReferences(vid)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.References = *refs
+
+	// Get exploit
+	exploit, exploitable, err := vars.GetExploit(vid)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.Exploit = exploit
+	vuln.Exploitable = exploitable
+
+	return vuln, nil
 }
-*/
 
 // UpdateSystem updates the edited parts of the system
 func UpdateSystem(db *sql.DB, sys *vars.System) error {

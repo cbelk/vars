@@ -165,7 +165,6 @@ func main() {
 }
 
 func testAddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
-	fmt.Printf("\n\nAdding vulnid %v sysid %v\n", vuln.ID, sys.ID)
 	return varsapi.AddAffected(db, vuln, sys)
 }
 
@@ -185,7 +184,6 @@ func testAddSystems(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("\n\nAdded system: %v\n\n", v)
 	}
 	return nil
 }
@@ -227,7 +225,6 @@ func testGetActiveSystems() error {
 }
 
 func testGetSystem(sysname string) (*vars.System, error) {
-	fmt.Printf("\n\nsysname is %v\n\n", sysname)
 	var s vars.System
 	sid, err := vars.GetSystemID(sysname)
 	if err != nil {
@@ -241,13 +238,12 @@ func testGetSystem(sysname string) (*vars.System, error) {
 }
 
 func testGetVulnerability(vname string) (*vars.Vulnerability, error) {
-	fmt.Printf("\n\nvname is %v\n\n", vname)
 	var v vars.Vulnerability
 	vid, err := vars.GetVulnID(vname)
 	if err != nil {
 		return &v, err
 	}
-	vuln, err := vars.GetVulnerability(vid)
+	vuln, err := varsapi.GetVulnerability(vid)
 	if !vars.IsNilErr(err) {
 		return &v, err
 	}

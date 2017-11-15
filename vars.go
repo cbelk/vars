@@ -114,6 +114,7 @@ var (
 		ssGetSystems:       "GetSystems",
 		ssGetSystemID:      "GetSystemID",
 		ssGetTickets:       "GetTickets",
+		ssGetVuln:          "GetVulnerability",
 		ssInsertAffected:   "InsertAffected",
 		ssInsertDates:      "InsertDates",
 		ssInsertExploit:    "InsertExploit",
@@ -211,7 +212,7 @@ func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
 	var exploitable VarsNullBool
 	err := queries[ssGetExploit].QueryRow(vid).Scan(&exploitable, &exploit)
 	if err != nil && err != sql.ErrNoRows {
-		return exploit, exploitable, newErrFromErr(err, "GetExploit")
+		return exploit, exploitable, newErrFromErr(err, execNames[ssGetExploit])
 	}
 	return exploit, exploitable, nil
 }
@@ -223,7 +224,12 @@ func GetActiveSystems() (*[]System, error) {
 
 // GetReferences returns a pointer to a slice of urls associated with the vulnid.
 func GetReferences(vid int64) (*[]string, error) {
-	return execGetRowsStr(ssGetReferences, vid)
+	refs, err := execGetRowsStr(ssGetReferences, vid)
+	if !IsNilErr(err) {
+		var r []string
+		return &r, newErrFromErr(err, execNames[ssGetReferences])
+	}
+	return refs, nil
 }
 
 // GetSystem returns a system struct matching the given systemID.
@@ -264,50 +270,22 @@ func GetSystemIDtx(tx *sql.Tx, sysname string) (int64, error) {
 
 // GetTickets returns a spointer to a lice of tickets associated with the vulnid.
 func GetTickets(vid int64) (*[]string, error) {
-	return execGetRowsStr(ssGetTickets, vid)
+	ticks, err := execGetRowsStr(ssGetTickets, vid)
+	if !IsNilErr(err) {
+		var t []string
+		return &t, newErrFromErr(err, execNames[ssGetTickets])
+	}
+	return ticks, nil
 }
 
 // GetVulnerability returns a Vulnerability object for the given vulnid.
 func GetVulnerability(vid int64) (*Vulnerability, error) {
 	var vuln Vulnerability
-
 	vuln.ID = vid
-
-	// Get vuln fields
 	err := queries[ssGetVuln].QueryRow(vid).Scan(&vuln.Name, &vuln.Cve, &vuln.Finder, &vuln.Initiator, &vuln.Summary, &vuln.Test, &vuln.Mitigation)
 	if err != nil {
-		return &vuln, newErrFromErr(err, "GetVulnerability")
+		return &vuln, newErrFromErr(err, execNames[ssGetVuln])
 	}
-
-	// Get dates
-	vd, err := GetVulnDates(vid)
-	if !IsNilErr(err) {
-		return &vuln, newErrFromErr(err, "GetVulnerability")
-	}
-	vuln.Dates = *vd
-
-	// Get tickets
-	ticks, err := GetTickets(vid)
-	if !IsNilErr(err) {
-		return &vuln, newErrFromErr(err, "GetVulnerability")
-	}
-	vuln.Tickets = *ticks
-
-	// Get references
-	refs, err := GetReferences(vid)
-	if !IsNilErr(err) {
-		return &vuln, newErrFromErr(err, "GetVulnerability")
-	}
-	vuln.References = *refs
-
-	// Get exploit
-	exploit, exploitable, err := GetExploit(vid)
-	if !IsNilErr(err) {
-		return &vuln, newErrFromErr(err, "GetVulnerability")
-	}
-	vuln.Exploit = exploit
-	vuln.Exploitable = exploitable
-
 	return &vuln, nil
 }
 
@@ -338,7 +316,7 @@ func GetVulnDates(vid int64) (*VulnDates, error) {
 	var vd VulnDates
 	err := queries[ssGetVulnDates].QueryRow(vid).Scan(&vd.Published, &vd.Initiated, &vd.Mitigated)
 	if err != nil {
-		return &vd, newErrFromErr(err, "GetVulnDates")
+		return &vd, newErrFromErr(err, execNames[ssGetVulnDates])
 	}
 	return &vd, nil
 }
