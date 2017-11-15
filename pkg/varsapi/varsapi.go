@@ -3,10 +3,10 @@ package varsapi
 import (
 	"database/sql"
 	//	"encoding/json"
-	"errors"
+	//	"errors"
 	"log"
-	"net/url"
-	"strconv"
+	//	"net/url"
+	//	"strconv"
 
 	"github.com/cbelk/vars"
 )
@@ -225,8 +225,8 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 		return err
 	}
 
-	//Start transaction and set rollback function
-	log.Print("DecommissionSystem: Starting transaction")
+	// Start transaction and set rollback function
+	log.Print("UpdateSystem: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -287,7 +287,7 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	}
 
 	// Commit the transaction
-	log.Print("DecommissionSystem: Committing transaction")
+	log.Print("UpdateSystem: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -295,18 +295,14 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
-func UpdateVulnerability(db *sql.DB, v url.Values) error {
-	// Get the vulnid
-	id := v.Get("vulnid")
-	if id == "" {
-		return errors.New("UpdateVulnerability: Error: No vulnid in request")
-	}
-	vid, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
+func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
+	// Get the old vulnerability
+	old, err := vars.GetVulnerability(vuln.ID)
+	if !vars.IsNilErr(err) {
 		return err
 	}
 
-	//Start transaction and set rollback function
+	// Start transaction and set rollback function
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -318,15 +314,95 @@ func UpdateVulnerability(db *sql.DB, v url.Values) error {
 		}
 	}()
 
-	// Update vulnname
-	if vname := v.Get("vulnname"); vname != "" {
-		err = vars.UpdateVulnName(tx, vid, vname)
-		if err != nil {
+	// Compare old vulnerability object to new vulnerability object and update appropriate parts
+	if old.Name != vuln.Name {
+		// Check new name
+		a, err := vars.NameIsAvailable(*vuln)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		if !a {
+			return vars.ErrNameNotAvailable
+		}
+
+		// Update name
+		err = vars.UpdateVulnName(tx, vuln.ID, vuln.Name)
+		if !vars.IsNilErr(err) {
 			return err
 		}
 	}
-
-	// Update CVE
+	if old.Cve != vuln.Cve {
+		err = vars.UpdateCve(tx, vuln.ID, vuln.Cve)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Cvss != vuln.Cvss {
+		err = vars.UpdateCvss(tx, vuln.ID, vuln.Cvss)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.CorpScore != vuln.CorpScore {
+		err = vars.UpdateCorpScore(tx, vuln.ID, vuln.CorpScore)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.CvssLink != vuln.CvssLink {
+		err = vars.UpdateCvssLink(tx, vuln.ID, vuln.CvssLink)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Finder != vuln.Finder {
+		err = vars.UpdateFinder(tx, vuln.ID, vuln.Finder)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Initiator != vuln.Initiator {
+		err = vars.UpdateInitiator(tx, vuln.ID, vuln.Initiator)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Summary != vuln.Summary {
+		err = vars.UpdateSummary(tx, vuln.ID, vuln.Summary)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Test != vuln.Test {
+		err = vars.UpdateTest(tx, vuln.ID, vuln.Test)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Mitigation != vuln.Mitigation {
+		err = vars.UpdateMitigation(tx, vuln.ID, vuln.Mitigation)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Dates.Published != vuln.Dates.Published {
+		err = vars.UpdatePubDate(tx, vuln.ID, vuln.Dates.Published)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Dates.Initiated != vuln.Dates.Initiated {
+		err = vars.UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Dates.Mitigated != vuln.Dates.Mitigated {
+		err = vars.UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
 
 	rollback = false
 	if e := tx.Commit(); e != nil {

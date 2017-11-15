@@ -24,7 +24,7 @@ var (
 	}
 	vulns = []vars.Vulnerability{
 		{Name: "DirtyCOW", Cve: vars.VarsNullString{sql.NullString{String: "CVE-2016-5195", Valid: true}}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
-		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/1/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
+		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/2/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
 	}
 )
 
@@ -52,20 +52,21 @@ func main() {
 	}
 
 	// Test getting all active systems
-	fmt.Println("Active systems are:")
+	fmt.Println("\n\nActive systems are:")
 	err = testGetActiveSystems()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test adding all employees
-	fmt.Println("Adding employees ...\n\n")
+	fmt.Println("\n\nAdding employees ...\n\n")
 	err = testAddEmps(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test updating a system
+	fmt.Println("\n\nUpdating system...\n")
 	nSys := vars.System{Name: "mtx102", Type: "router", OpSys: "KasperkyOS", Location: "hosted", Description: "Some other server"}
 	id, err := vars.GetSystemID(nSys.Name)
 	if !vars.IsNilErr(err) {
@@ -76,24 +77,30 @@ func main() {
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
+	ns, err := testGetSystem(nSys.Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("\n\nRetrieving system 0")
+	fmt.Println(ns)
 
 	// Test decomissioning a system
 	s := 1
-	fmt.Println("Decomissioning system ", systems[s].Name, "\n")
+	fmt.Println("\n\nDecomissioning system ", systems[s].Name, "\n")
 	err = testDecomSystem(db, systems[s])
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test getting all active systems again
-	fmt.Println("Active systems are:")
+	fmt.Println("\n\nActive systems are:")
 	err = testGetActiveSystems()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Test adding vulnerabilites
-	fmt.Println("Adding vulnerabilities ...\n\n")
+	fmt.Println("\n\nAdding vulnerabilities ...\n\n")
 	err = testAddVulnerabilities(db)
 	if err != nil {
 		log.Fatal(err)
@@ -104,16 +111,25 @@ func main() {
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	fmt.Println("Retrieving vulnerability 0")
+	fmt.Println("\n\nRetrieving vulnerability 0")
 	fmt.Println(v0)
 
 	v1, err := testGetVulnerability(vulns[1].Name)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	fmt.Println("Retrieving vulnerability 1")
+	fmt.Println("\n\nRetrieving vulnerability 1")
 	fmt.Println(v1)
 
+	// Test updating vuln
+	v1.Dates.Published = vars.ToVarsNullString("1/1/1970")
+	v1.References = append(v1.References, "someOther.ref")
+	err = varsapi.UpdateVulnerability(db, v1)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+
+	fmt.Println("\n\nRetrieving vulnerabilities\n")
 	err = testGetVulnerabilities()
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
@@ -124,18 +140,18 @@ func main() {
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	fmt.Println("Retrieving system 0")
+	fmt.Println("\n\nRetrieving system 0")
 	fmt.Println(s0)
 
 	s2, err := testGetSystem(systems[2].Name)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	fmt.Println("Retrieving system 2")
+	fmt.Println("\n\nRetrieving system 2")
 	fmt.Println(s2)
 
 	// Test adding affected systems
-	fmt.Println("Adding affected systems ...\n\n")
+	fmt.Println("\n\nAdding affected systems ...\n\n")
 	err = testAddAffected(db, v0, s0)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
@@ -145,11 +161,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Done!")
+	fmt.Println("\n\nDone!")
 }
 
 func testAddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
-	fmt.Printf("Adding vulnid %v sysid %v\n", vuln.ID, sys.ID)
+	fmt.Printf("\n\nAdding vulnid %v sysid %v\n", vuln.ID, sys.ID)
 	return varsapi.AddAffected(db, vuln, sys)
 }
 
@@ -169,7 +185,7 @@ func testAddSystems(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Added system: ", v)
+		fmt.Printf("\n\nAdded system: %v\n\n", v)
 	}
 	return nil
 }
@@ -211,7 +227,7 @@ func testGetActiveSystems() error {
 }
 
 func testGetSystem(sysname string) (*vars.System, error) {
-	fmt.Printf("sysname is %v\n\n", sysname)
+	fmt.Printf("\n\nsysname is %v\n\n", sysname)
 	var s vars.System
 	sid, err := vars.GetSystemID(sysname)
 	if err != nil {
@@ -225,7 +241,7 @@ func testGetSystem(sysname string) (*vars.System, error) {
 }
 
 func testGetVulnerability(vname string) (*vars.Vulnerability, error) {
-	fmt.Printf("vname is %v\n\n", vname)
+	fmt.Printf("\n\nvname is %v\n\n", vname)
 	var v vars.Vulnerability
 	vid, err := vars.GetVulnID(vname)
 	if err != nil {
@@ -274,7 +290,7 @@ func testGetVulnerabilities() error {
 		vuln.Exploit = exploit
 		vuln.Exploitable = exploitable
 
-		fmt.Printf("Vulnerability:\n%v\n", *vuln)
+		fmt.Printf("\n\nVulnerability:\n%v\n", *vuln)
 	}
 	return nil
 }
