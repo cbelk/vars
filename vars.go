@@ -115,6 +115,8 @@ var (
 		ssGetSystemID:      "GetSystemID",
 		ssGetTickets:       "GetTickets",
 		ssGetVuln:          "GetVulnerability",
+		ssGetVulns:         "GetVulnerabilities",
+		ssGetVulnID:        "GetVulnID",
 		ssInsertAffected:   "InsertAffected",
 		ssInsertDates:      "InsertDates",
 		ssInsertExploit:    "InsertExploit",
@@ -237,8 +239,8 @@ func GetSystem(sid int64) (*System, error) {
 	var sys System
 	sys.ID = sid
 	err := queries[ssGetSystem].QueryRow(sid).Scan(&sys.Name, &sys.Type, &sys.OpSys, &sys.Location, &sys.Description, &sys.State)
-	if err != nil && err != sql.ErrNoRows {
-		return &sys, newErrFromErr(err, "GetSystem")
+	if !IsNilErr(err) {
+		return &sys, newErrFromErr(err, execNames[ssGetSystem])
 	}
 	return &sys, nil
 }
@@ -253,7 +255,7 @@ func GetSystemID(sysname string) (int64, error) {
 	var id int64
 	err := queries[ssGetSystemID].QueryRow(sysname).Scan(&id)
 	if err != nil {
-		return id, newErrFromErr(err, "GetSystemID")
+		return id, newErrFromErr(err, execNames[ssGetSystemID])
 	}
 	return id, nil
 }
@@ -263,7 +265,7 @@ func GetSystemIDtx(tx *sql.Tx, sysname string) (int64, error) {
 	var id int64
 	err := tx.Stmt(queries[ssGetSystemID]).QueryRow(sysname).Scan(&id)
 	if err != nil {
-		return id, newErrFromErr(err, "GetSystemIDtx")
+		return id, newErrFromErr(err, execNames[ssGetSystemID])
 	}
 	return id, nil
 }
@@ -295,18 +297,18 @@ func GetVulnerabilities() ([]*Vulnerability, error) {
 	vulns := []*Vulnerability{}
 	rows, err := queries[ssGetVulns].Query()
 	if err != nil {
-		return vulns, newErrFromErr(err, "GetVulnerabilities")
+		return vulns, newErrFromErr(err, execNames[ssGetVulns])
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var v Vulnerability
 		if err := rows.Scan(&v.ID, &v.Name, &v.Cve, &v.Finder, &v.Initiator, &v.Summary, &v.Test, &v.Mitigation); err != nil {
-			return vulns, newErrFromErr(err, "GetVulnerabilities", "row.Scan")
+			return vulns, newErrFromErr(err, execNames[ssGetVulns], "row.Scan")
 		}
 		vulns = append(vulns, &v)
 	}
 	if err := rows.Err(); err != nil {
-		return vulns, newErrFromErr(err, "GetVulnerabilities")
+		return vulns, newErrFromErr(err, execNames[ssGetVulns])
 	}
 	return vulns, nil
 }
@@ -326,7 +328,7 @@ func GetVulnID(vname string) (int64, error) {
 	var id int64
 	err := queries[ssGetVulnID].QueryRow(vname).Scan(&id)
 	if err != nil {
-		return id, newErrFromErr(err, "GetVulnID")
+		return id, newErrFromErr(err, execNames[ssGetVulnID])
 	}
 	return id, nil
 }
@@ -336,7 +338,7 @@ func GetVulnIDtx(tx *sql.Tx, vulnname string) (int64, error) {
 	var id int64
 	err := tx.Stmt(queries[ssGetVulnID]).QueryRow(vulnname).Scan(&id)
 	if err != nil {
-		return id, newErrFromErr(err, "GetVulnIDtx")
+		return id, newErrFromErr(err, execNames[ssGetVulnID])
 	}
 	return id, nil
 }
