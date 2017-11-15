@@ -77,3 +77,8 @@ func prepareStatements(db *sql.DB) error {
 func toNullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
+
+// ToVarsNullString creates a VarsNullString from a string.
+func ToVarsNullString(s string) VarsNullString {
+	return VarsNullString{toNullString(s)}
+}
