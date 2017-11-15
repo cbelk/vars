@@ -65,6 +65,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Test updating a system
+	nSys := vars.System{Name: "mtx102", Type: "router", OpSys: "KasperkyOS", Location: "hosted", Description: "Some other server"}
+	id, err := vars.GetSystemID(nSys.Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	nSys.ID = id
+	err = varsapi.UpdateSystem(db, &nSys)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+
 	// Test decomissioning a system
 	s := 1
 	fmt.Println("Decomissioning system ", systems[s].Name, "\n")

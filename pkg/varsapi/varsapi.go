@@ -2,7 +2,7 @@ package varsapi
 
 import (
 	"database/sql"
-	"encoding/json"
+	//	"encoding/json"
 	"errors"
 	"log"
 	"net/url"
@@ -202,6 +202,7 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+/*
 // GetVulnerability retrieves/returns the vulnerability with the given id.
 func GetVulnerability(id string) ([]byte, error) {
 	vid, err := strconv.ParseInt(id, 10, 64)
@@ -214,8 +215,83 @@ func GetVulnerability(id string) ([]byte, error) {
 	}
 	return json.Marshal(vuln)
 }
+*/
 
+// UpdateSystem updates the edited parts of the system
 func UpdateSystem(db *sql.DB, sys *vars.System) error {
+	// Get the old system
+	old, err := vars.GetSystem(sys.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	//Start transaction and set rollback function
+	log.Print("DecommissionSystem: Starting transaction")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Compare old system object to new system object and update appropriate parts
+	if old.Name != sys.Name {
+		// Check new name
+		a, err := vars.NameIsAvailable(*sys)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		if !a {
+			return vars.ErrNameNotAvailable
+		}
+
+		// Update name
+		err = vars.UpdateSysName(tx, sys.ID, sys.Name)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Type != sys.Type {
+		err = vars.UpdateSysType(tx, sys.ID, sys.Type)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.OpSys != sys.OpSys {
+		err = vars.UpdateSysOS(tx, sys.ID, sys.OpSys)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Location != sys.Location {
+		err = vars.UpdateSysLoc(tx, sys.ID, sys.Location)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Description != sys.Description {
+		err = vars.UpdateSysDesc(tx, sys.ID, sys.Description)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.State != sys.State {
+		err = vars.UpdateSysState(tx, sys.ID, sys.State)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	log.Print("DecommissionSystem: Committing transaction")
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
 	return nil
 }
 
