@@ -13,6 +13,8 @@ const (
 	ssActiveSystems sqlStatement = iota
 	ssCheckVulnName
 	ssCheckSysName
+	ssDeleteRef
+	ssDeleteTicket
 	ssGetExploit
 	ssGetReferences
 	ssGetSystem
@@ -64,6 +66,8 @@ var (
 		ssActiveSystems:    "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
 		ssCheckVulnName:    "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
+		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
+		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -108,6 +112,8 @@ var (
 		ssUpdateVulnName:   "UPDATE vuln SET vulnname=$1 WHERE vulnid=$2;",
 	}
 	execNames = map[sqlStatement]string{
+		ssDeleteRef:        "DeleteRef",
+		ssDeleteTicket:     "DeleteTicket",
 		ssGetExploit:       "GetExploit",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
@@ -208,6 +214,16 @@ func AddEmployee(db *sql.DB, emp *Employee) error {
 	return nil
 }
 
+// DeleteRef deletes the row in the ref table with the given vulnid and url.
+func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
+	return execMutation(tx, ssDeleteRef, vid, ref)
+}
+
+// DeleteTicket deletes the row in the tickets table with the given vulnid and ticket.
+func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
+	return execMutation(tx, ssDeleteTicket, vid, ticket)
+}
+
 // GetExploit returns the row from the exploits table for the given vulnid.
 func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
 	var exploit VarsNullString
@@ -270,7 +286,7 @@ func GetSystemIDtx(tx *sql.Tx, sysname string) (int64, error) {
 	return id, nil
 }
 
-// GetTickets returns a spointer to a lice of tickets associated with the vulnid.
+// GetTickets returns a pointer to a slice of tickets associated with the vulnid.
 func GetTickets(vid int64) (*[]string, error) {
 	ticks, err := execGetRowsStr(ssGetTickets, vid)
 	if !IsNilErr(err) {

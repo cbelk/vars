@@ -2,9 +2,9 @@ package varsapi
 
 import (
 	"database/sql"
+	"fmt"
 	//	"encoding/json"
 	//	"errors"
-	"log"
 	//	"net/url"
 	//	"strconv"
 
@@ -14,7 +14,6 @@ import (
 // AddAffected adds a new vulnerability/system pair to the affected table
 func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	//Start transaction and set rollback function
-	log.Print("AddSystem: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -27,14 +26,12 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	}()
 
 	// Add affected
-	log.Print("AddAffected: Adding affected system")
 	err = vars.InsertAffected(tx, vuln.ID, sys.ID)
 	if !vars.IsNilErr(err) {
 		return err
 	}
 
 	// Commit the transaction
-	log.Print("AddAffected: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -45,7 +42,6 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 // AddSystem adds a new system to the database.
 func AddSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
-	log.Print("AddSystem: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -67,7 +63,6 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	}
 
 	// Add system
-	log.Print("AddSystem: Adding sys")
 	err = vars.InsertSystem(tx, sys)
 	if ve, ok := err.(vars.Err); ok {
 		if !vars.IsNilErr(ve) {
@@ -87,7 +82,6 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	sys.ID = id
 
 	// Commit the transaction
-	log.Print("AddSystem: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -98,7 +92,6 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 // AddVulnerability starts a new VA
 func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	//Start transaction and set rollback function
-	log.Print("AddVulnerability: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -163,7 +156,6 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}
 
 	// Commit the transaction
-	log.Print("AddVulnerability: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -174,7 +166,6 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 // DecommissionSystem sets the state of the given system to decommissioned.
 func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
-	log.Print("DecommissionSystem: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -187,19 +178,32 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	}()
 
 	// Decommission system
-	log.Print("DecommissionSystem: Decommissioning ", sys)
 	err = vars.UpdateSysState(tx, sys.ID, "decommissioned")
 	if !vars.IsNilErr(err) {
 		return err
 	}
 
 	// Commit the transaction
-	log.Print("DecommissionSystem: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
 	}
 	return nil
+}
+
+// GetSystem retieves/returns the system with the given id.
+func GetSystem(sid int64) (*vars.System, error) {
+	return vars.GetSystem(sid)
+}
+
+// GetSystemByName retieves/returns the system with the given name.
+func GetSystemByName(name string) (*vars.System, error) {
+	id, err := vars.GetSystemID(name)
+	if !vars.IsNilErr(err) {
+		var s vars.System
+		return &s, err
+	}
+	return vars.GetSystem(id)
 }
 
 // GetVulnerability retrieves/returns the vulnerability with the given id.
@@ -244,6 +248,16 @@ func GetVulnerability(vid int64) (*vars.Vulnerability, error) {
 	return vuln, nil
 }
 
+// GetVulnerabilityByName retrieves/returns the vulnerability with the given name.
+func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
+	id, err := vars.GetVulnID(name)
+	if !vars.IsNilErr(err) {
+		var v vars.Vulnerability
+		return &v, err
+	}
+	return GetVulnerability(id)
+}
+
 // UpdateSystem updates the edited parts of the system
 func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	// Get the old system
@@ -253,7 +267,6 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	}
 
 	// Start transaction and set rollback function
-	log.Print("UpdateSystem: Starting transaction")
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -314,7 +327,6 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	}
 
 	// Commit the transaction
-	log.Print("UpdateSystem: Committing transaction")
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
@@ -322,12 +334,23 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// UpdateVulnerability updates the edited parts of the vulnerability
 func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	// Get the old vulnerability
 	old, err := vars.GetVulnerability(vuln.ID)
 	if !vars.IsNilErr(err) {
 		return err
 	}
+	tickets, err := vars.GetTickets(vuln.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	old.Tickets = *tickets
+	refs, err := vars.GetReferences(vuln.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	old.References = *refs
 
 	// Start transaction and set rollback function
 	tx, err := db.Begin()
@@ -430,10 +453,103 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 			return err
 		}
 	}
+	if vuln.Exploit.Valid {
+		if old.Exploit.Valid {
+			if old.Exploit.String != vuln.Exploit.String {
+				err = vars.UpdateExploit(tx, vuln.ID, vuln.Exploit.String)
+				if !vars.IsNilErr(err) {
+					return err
+				}
+			}
+		}
+		err = vars.UpdateExploit(tx, vuln.ID, vuln.Exploit.String)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	err = UpdateTickets(tx, old, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	err = UpdateReferences(tx, old, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
 
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
 	}
 	return nil
+}
+
+// UpdateReferences determines the rows that need to be deleted/added and calls the appropriate VARS function.
+func UpdateReferences(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
+	del := toBeDeleted(&old.References, &vuln.References)
+	for _, ref := range *del {
+		err := vars.DeleteRef(tx, vuln.ID, ref)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	add := toBeAdded(&old.References, &vuln.References)
+	for _, ref := range *add {
+		err := vars.InsertRef(tx, vuln.ID, ref)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// UpdateTickets determines the rows that need to be deleted/added and calls the appropriate VARS function.
+func UpdateTickets(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
+	del := toBeDeleted(&old.Tickets, &vuln.Tickets)
+	for _, tick := range *del {
+		err := vars.DeleteTicket(tx, vuln.ID, tick)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	add := toBeAdded(&old.Tickets, &vuln.Tickets)
+	for _, tick := range *add {
+		err := vars.InsertTicket(tx, vuln.ID, tick)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// stringInSlice searches for the given string in the given slice and returns a boolean value indicating whether
+// the string is contained in the slice.
+func stringInSlice(str string, slice *[]string) bool {
+	for _, item := range *slice {
+		if item == str {
+			return true
+		}
+	}
+	return false
+}
+
+// toBeAdded creates a slice of items that are in the new slice but not the old.
+func toBeAdded(oldSlice, newSlice *[]string) *[]string {
+	var add []string
+	for _, item := range *newSlice {
+		if !stringInSlice(item, oldSlice) {
+			add = append(add, item)
+		}
+	}
+	return &add
+}
+
+// toBeDeleted creates a slice of items that are in the old slice but not the new.
+func toBeDeleted(oldSlice, newSlice *[]string) *[]string {
+	var del []string
+	for _, item := range *oldSlice {
+		if !stringInSlice(item, newSlice) {
+			del = append(del, item)
+		}
+	}
+	return &del
 }

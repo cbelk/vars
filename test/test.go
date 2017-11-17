@@ -207,7 +207,9 @@ func testUpdateVulnerability(db *sql.DB) {
 		log.Fatal(err)
 	}
 	vuln.Dates.Published = vars.ToVarsNullString("1/1/1970")
-	vuln.References = append(vuln.References, "someOther.ref")
+	vuln.Tickets = append(vuln.Tickets, "ticket411")
+	vuln.Tickets[0] = "ticket917"
+	vuln.References = []string{"some new reference"}
 	err = varsapi.UpdateVulnerability(db, vuln)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
