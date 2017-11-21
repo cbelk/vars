@@ -15,6 +15,7 @@ const (
 	ssCheckSysName
 	ssDeleteRef
 	ssDeleteTicket
+	ssGetEmpID
 	ssGetExploit
 	ssGetReferences
 	ssGetSystem
@@ -68,6 +69,7 @@ var (
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
+		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -114,6 +116,7 @@ var (
 	execNames = map[sqlStatement]string{
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
+		ssGetEmpID:         "GetEmpID",
 		ssGetExploit:       "GetExploit",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
@@ -125,6 +128,7 @@ var (
 		ssGetVulnID:        "GetVulnID",
 		ssInsertAffected:   "InsertAffected",
 		ssInsertDates:      "InsertDates",
+		ssInsertEmployee:   "InsertEmployee",
 		ssInsertExploit:    "InsertExploit",
 		ssInsertImpact:     "InsertImpact",
 		ssInsertRefers:     "InsertRef",
@@ -202,18 +206,6 @@ type Vulnerability struct {
 	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
 }
 
-// AddEmployee inserts a new employee into the VARS database.
-func AddEmployee(db *sql.DB, emp *Employee) error {
-	res, err := queries[ssInsertEmployee].Exec(emp.FirstName, emp.LastName, emp.Email)
-	if rows, _ := res.RowsAffected(); rows < 1 {
-		return newErr(noRowsInserted, "AddEmployee")
-	}
-	if err != nil {
-		return newErrFromErr(err, "AddEmployee")
-	}
-	return nil
-}
-
 // DeleteRef deletes the row in the ref table with the given vulnid and url.
 func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
 	return execMutation(tx, ssDeleteRef, vid, ref)
@@ -222,6 +214,26 @@ func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
 // DeleteTicket deletes the row in the tickets table with the given vulnid and ticket.
 func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 	return execMutation(tx, ssDeleteTicket, vid, ticket)
+}
+
+// GetEmpID returns the empid associated with the employee.
+func GetEmpID(first, last, email string) (int64, error) {
+	var id int64
+	err := queries[ssGetEmpID].QueryRow(first, last, email).Scan(&id)
+	if err != nil {
+		return id, newErrFromErr(err, execNames[ssGetEmpID])
+	}
+	return id, nil
+}
+
+// GetEmpIDtx returns the empid associated with the employee.
+func GetEmpIDtx(tx *sql.Tx, first, last, email string) (int64, error) {
+	var id int64
+	err := tx.Stmt(queries[ssGetEmpID]).QueryRow(first, last, email).Scan(&id)
+	if err != nil {
+		return id, newErrFromErr(err, execNames[ssGetEmpID])
+	}
+	return id, nil
 }
 
 // GetExploit returns the row from the exploits table for the given vulnid.
@@ -367,6 +379,11 @@ func InsertAffected(tx *sql.Tx, vid, sid int64) Err {
 // InsertDates inserts the dates published, initiated, and mitigated.
 func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) error {
 	return execMutation(tx, ssInsertDates, vid, pub, ini, mit)
+}
+
+// InsertEmployee inserts the employee's first name, last name, and email.
+func InsertEmployee(tx *sql.Tx, first, last, email string) error {
+	return execMutation(tx, ssInsertEmployee, first, last, email)
 }
 
 // InsertImpact inserts the CVSS score, Corpscore, and CVSSlink.

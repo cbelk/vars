@@ -2,7 +2,7 @@ package varsapi
 
 import (
 	"database/sql"
-	"fmt"
+	//	"fmt"
 	//	"encoding/json"
 	//	"errors"
 	//	"net/url"
@@ -30,6 +30,41 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	if !vars.IsNilErr(err) {
 		return err
 	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// AddEmployee inserts a new employee into the database.
+func AddEmployee(db *sql.DB, emp *vars.Employee) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Add employee
+	err = vars.InsertEmployee(tx, emp.FirstName, emp.LastName, emp.Email)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Update the employee ID
+	id, err := vars.GetEmpIDtx(tx, emp.FirstName, emp.LastName, emp.Email)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	emp.ID = id
 
 	// Commit the transaction
 	rollback = false

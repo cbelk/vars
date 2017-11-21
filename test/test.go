@@ -112,7 +112,7 @@ func testAddEmps(db *sql.DB) {
 	fmt.Println("\nAdding employees ...\n\n")
 	for _, v := range emps {
 		fmt.Printf("Adding employee %v %v ...\n", v.FirstName, v.LastName)
-		err := vars.AddEmployee(db, &v)
+		err := varsapi.AddEmployee(db, &v)
 		if !vars.IsNilErr(err) {
 			log.Fatal(err)
 		}
