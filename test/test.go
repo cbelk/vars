@@ -47,8 +47,8 @@ func main() {
 	// Test adding all systems
 	testAddSystems(db)
 
-	// Test getting all active systems
-	testGetActiveSystems()
+	// Test getting all systems
+	testGetSystems()
 
 	// Test adding all employees
 	testAddEmps(db)
@@ -162,8 +162,8 @@ func testGetActiveSystems() {
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	for _, sys := range *syss {
-		fmt.Printf("%v\n", sys)
+	for _, sys := range syss {
+		fmt.Printf("%v\n", *sys)
 	}
 }
 
@@ -185,6 +185,17 @@ func testGetSystem(sysname string) {
 		log.Fatal(err)
 	}
 	fmt.Printf("%v\n", sys)
+}
+
+func testGetSystems() {
+	fmt.Println("Retrieving all systems ...")
+	syss, err := varsapi.GetSystems()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	for _, s := range syss {
+		fmt.Println(*s)
+	}
 }
 
 func testGetVulnerabilities() {

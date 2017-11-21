@@ -65,7 +65,7 @@ const (
 var (
 	queries      map[sqlStatement]*sql.Stmt
 	queryStrings = map[sqlStatement]string{
-		ssActiveSystems:    "SELECT sysid, sysname, systype, opsys, location, description FROM systems WHERE state='active';",
+		ssActiveSystems:    "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems WHERE state='active';",
 		ssCheckVulnName:    "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
@@ -116,6 +116,7 @@ var (
 		ssUpdateVulnName:   "UPDATE vuln SET vulnname=$1 WHERE vulnid=$2;",
 	}
 	execNames = map[sqlStatement]string{
+		ssActiveSystems:    "GetActiveSystems",
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
 		ssGetEmpID:         "GetEmpID",
@@ -219,6 +220,11 @@ func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 	return execMutation(tx, ssDeleteTicket, vid, ticket)
 }
 
+// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
+func GetActiveSystems() ([]*System, error) {
+	return execGetRowsSys(ssActiveSystems)
+}
+
 // GetEmpID returns the empid associated with the employee.
 func GetEmpID(first, last, email string) (int64, error) {
 	var id int64
@@ -271,11 +277,6 @@ func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
 	return exploit, exploitable, nil
 }
 
-// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
-func GetActiveSystems() (*[]System, error) {
-	return execGetRowsSys(ssActiveSystems)
-}
-
 // GetReferences returns a pointer to a slice of urls associated with the vulnid.
 func GetReferences(vid int64) (*[]string, error) {
 	refs, err := execGetRowsStr(ssGetReferences, vid)
@@ -298,7 +299,7 @@ func GetSystem(sid int64) (*System, error) {
 }
 
 // GetSystems returns a pointer to a slice of System types representing all systems.
-func GetSystems() (*[]System, error) {
+func GetSystems() ([]*System, error) {
 	return execGetRowsSys(ssGetSystems)
 }
 
@@ -675,22 +676,22 @@ func execGetRowsStr(ss sqlStatement, args ...interface{}) (*[]string, error) {
 }
 
 // execGetRowsSys executes the query referenced by ss in the queries map and returns a pointer to a slice of System and an error.
-func execGetRowsSys(ss sqlStatement, args ...interface{}) (*[]System, error) {
-	res := []System{}
+func execGetRowsSys(ss sqlStatement, args ...interface{}) ([]*System, error) {
+	res := []*System{}
 	rows, err := queries[ss].Query(args...)
 	if err != nil {
-		return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
+		return res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var r System
-		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.OpSys, &r.Location, &r.Description); err != nil {
-			return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.Scan")
+		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.OpSys, &r.Location, &r.Description, &r.State); err != nil {
+			return res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.Scan")
 		}
-		res = append(res, r)
+		res = append(res, &r)
 	}
 	if err := rows.Err(); err != nil {
-		return &res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
+		return res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
 	}
-	return &res, nil
+	return res, nil
 }

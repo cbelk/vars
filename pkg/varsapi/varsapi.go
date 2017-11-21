@@ -246,6 +246,10 @@ func GetSystemByName(name string) (*vars.System, error) {
 	return vars.GetSystem(id)
 }
 
+func GetSystems() ([]*vars.System, error) {
+	return vars.GetSystems()
+}
+
 // GetVulnerabilities retrieves/returns all vulnerabilities.
 func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 	// Get vulnerabilities (vuln fields)
