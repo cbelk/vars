@@ -53,6 +53,9 @@ func main() {
 	// Test adding all employees
 	testAddEmps(db)
 
+	// Test getting all employees
+	testGetEmployees()
+
 	// Test updating a system
 	testUpdateSystem(db)
 
@@ -164,6 +167,17 @@ func testGetActiveSystems() {
 	}
 	for _, sys := range *syss {
 		fmt.Printf("%v\n", sys)
+	}
+}
+
+func testGetEmployees() {
+	fmt.Println("Retrieving employees ...")
+	emps, err := varsapi.GetEmployees()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	for _, emp := range emps {
+		fmt.Printf("Struct for %v %v:\n%v\n", emp.FirstName, emp.LastName, emp)
 	}
 }
 

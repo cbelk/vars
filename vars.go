@@ -15,6 +15,7 @@ const (
 	ssCheckSysName
 	ssDeleteRef
 	ssDeleteTicket
+	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
 	ssGetReferences
@@ -70,6 +71,7 @@ var (
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
 		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
+		ssGetEmps:          "SELECT empid, firstname, lastname, email FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -117,6 +119,7 @@ var (
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
 		ssGetEmpID:         "GetEmpID",
+		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
@@ -234,6 +237,27 @@ func GetEmpIDtx(tx *sql.Tx, first, last, email string) (int64, error) {
 		return id, newErrFromErr(err, execNames[ssGetEmpID])
 	}
 	return id, nil
+}
+
+// GetEmployees returns a slice of pointers to Employee objects.
+func GetEmployees() ([]*Employee, error) {
+	emps := []*Employee{}
+	rows, err := queries[ssGetEmps].Query()
+	if err != nil {
+		return emps, newErrFromErr(err, execNames[ssGetEmps])
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e Employee
+		if err := rows.Scan(&e.ID, &e.FirstName, &e.LastName, &e.Email); err != nil {
+			return emps, newErrFromErr(err, execNames[ssGetEmps], "rows.Scan")
+		}
+		emps = append(emps, &e)
+	}
+	if err := rows.Err(); err != nil {
+		return emps, newErrFromErr(err, execNames[ssGetEmps])
+	}
+	return emps, nil
 }
 
 // GetExploit returns the row from the exploits table for the given vulnid.

@@ -226,6 +226,10 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+func GetEmployees() ([]*vars.Employee, error) {
+	return vars.GetEmployees()
+}
+
 // GetSystem retieves/returns the system with the given id.
 func GetSystem(sid int64) (*vars.System, error) {
 	return vars.GetSystem(sid)
