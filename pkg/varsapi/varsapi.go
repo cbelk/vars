@@ -226,6 +226,7 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// GetEmployees returns a slice of pointers to Employee objects.
 func GetEmployees() ([]*vars.Employee, error) {
 	return vars.GetEmployees()
 }
@@ -243,6 +244,47 @@ func GetSystemByName(name string) (*vars.System, error) {
 		return &s, err
 	}
 	return vars.GetSystem(id)
+}
+
+// GetVulnerabilities retrieves/returns all vulnerabilities.
+func GetVulnerabilities() ([]*vars.Vulnerability, error) {
+	// Get vulnerabilities (vuln fields)
+	vulns, err := vars.GetVulnerabilities()
+	if !vars.IsNilErr(err) {
+		return vulns, err
+	}
+
+	for _, vuln := range vulns {
+		// Get dates
+		vd, err := vars.GetVulnDates(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.Dates = *vd
+
+		// Get tickets
+		ticks, err := vars.GetTickets(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.Tickets = *ticks
+
+		// Get references
+		refs, err := vars.GetReferences(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.References = *refs
+
+		// Get exploit
+		exploit, exploitable, err := vars.GetExploit(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.Exploit = exploit
+		vuln.Exploitable = exploitable
+	}
+	return vulns, nil
 }
 
 // GetVulnerability retrieves/returns the vulnerability with the given id.

@@ -75,11 +75,8 @@ func main() {
 	// Test updating vuln
 	testUpdateVulnerability(db)
 
-	fmt.Println("\n\nRetrieving vulnerabilities\n")
-	err = testGetVulnerabilities()
-	if !vars.IsNilErr(err) {
-		log.Fatal(err)
-	}
+	// Test getting all vulnerabilities
+	testGetVulnerabilities()
 
 	// Test getting systems
 	testGetSystem(systems[0].Name)
@@ -190,6 +187,17 @@ func testGetSystem(sysname string) {
 	fmt.Printf("%v\n", sys)
 }
 
+func testGetVulnerabilities() {
+	fmt.Println("Retrieving all vulnerabilities ...")
+	vulns, err := varsapi.GetVulnerabilities()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	for _, v := range vulns {
+		fmt.Println(*v)
+	}
+}
+
 func testGetVulnerability(vname string) {
 	fmt.Printf("Retrieving vulnerability %v:\n", vname)
 	vuln, err := varsapi.GetVulnerabilityByName(vname)
@@ -229,45 +237,4 @@ func testUpdateVulnerability(db *sql.DB) {
 		log.Fatal(err)
 	}
 	testGetVulnerability(vuln.Name)
-}
-
-func testGetVulnerabilities() error {
-	vulns, err := vars.GetVulnerabilities()
-	if !vars.IsNilErr(err) {
-		return err
-	}
-	for _, vuln := range vulns {
-
-		// Get dates
-		vd, err := vars.GetVulnDates(vuln.ID)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-		vuln.Dates = *vd
-
-		// Get tickets
-		ticks, err := vars.GetTickets(vuln.ID)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-		vuln.Tickets = *ticks
-
-		// Get references
-		refs, err := vars.GetReferences(vuln.ID)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-		vuln.References = *refs
-
-		// Get exploit
-		exploit, exploitable, err := vars.GetExploit(vuln.ID)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-		vuln.Exploit = exploit
-		vuln.Exploitable = exploitable
-
-		fmt.Printf("Vulnerability:\n%v\n", *vuln)
-	}
-	return nil
 }
