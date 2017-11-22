@@ -2,11 +2,6 @@ package varsapi
 
 import (
 	"database/sql"
-	//	"fmt"
-	//	"encoding/json"
-	//	"errors"
-	//	"net/url"
-	//	"strconv"
 
 	"github.com/cbelk/vars"
 )
