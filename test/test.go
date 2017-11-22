@@ -98,8 +98,9 @@ func main() {
 	// Test closing a VA
 	testCloseVulnerability(db, vulns[0].ID)
 
-	// Test getting open VAs
+	// Test getting open/closed VAs
 	testGetOpenVAs()
+	testGetClosedVAs()
 
 	fmt.Println("\n\nDone!")
 }
@@ -211,6 +212,18 @@ func testGetEmployees() {
 	}
 	for _, emp := range emps {
 		fmt.Printf("Struct for %v %v:\n%v\n", emp.FirstName, emp.LastName, emp)
+	}
+}
+
+func testGetClosedVAs() {
+	fmt.Println("Retrieving closed VAs ...")
+	vulns, err := varsapi.GetClosedVulnerabilities()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Closed vulnerabilities are:")
+	for _, vuln := range vulns {
+		fmt.Println(*vuln)
 	}
 }
 

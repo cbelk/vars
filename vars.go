@@ -19,6 +19,7 @@ const (
 	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
+	ssGetClosedVulnIDs
 	ssGetOpenVulnIDs
 	ssGetReferences
 	ssGetSystem
@@ -79,6 +80,7 @@ var (
 		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
 		ssGetEmps:          "SELECT empid, firstname, lastname, email FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
+		ssGetClosedVulnIDs: "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
 		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -133,6 +135,7 @@ var (
 		ssGetEmpID:         "GetEmpID",
 		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
+		ssGetClosedVulnIDs: "GetClosedVulnIDs",
 		ssGetOpenVulnIDs:   "GetOpenVulnIDs",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
@@ -303,25 +306,14 @@ func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
 	return exploit, exploitable, nil
 }
 
+// GetClosedVulnIDs returns a pointer to a slice of vulnerability IDs that have a mitigated date.
+func GetClosedVulnIDs() (*[]int64, error) {
+	return execGetRowsInt(ssGetClosedVulnIDs)
+}
+
 // GetOpenVulnIDs returns a pointer to a slice of vulnerability IDs that do not have a mitigated date.
 func GetOpenVulnIDs() (*[]int64, error) {
-	var ids []int64
-	rows, err := queries[ssGetOpenVulnIDs].Query()
-	if err != nil {
-		return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs])
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs], "rows.Scan")
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs], "rows.Err")
-	}
-	return &ids, nil
+	return execGetRowsInt(ssGetOpenVulnIDs)
 }
 
 // GetReferences returns a pointer to a slice of urls associated with the vulnid.
@@ -714,6 +706,27 @@ func execMutation(tx *sql.Tx, ss sqlStatement, args ...interface{}) Err {
 		err = newErr(noRowsUpdated, execNames[ss], "execMutation")
 	}
 	return err
+}
+
+// execGetRowsInt executes the query referenced by ss in the queries map and returns a pointer to a slice of int64 and an error.
+func execGetRowsInt(ss sqlStatement, args ...interface{}) (*[]int64, error) {
+	var res []int64
+	rows, err := queries[ss].Query(args...)
+	if err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsInt")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r int64
+		if err := rows.Scan(&r); err != nil {
+			return &res, newErrFromErr(err, execNames[ss], "execGetRowsInt", "rows.Scan")
+		}
+		res = append(res, r)
+	}
+	if err := rows.Err(); err != nil {
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsInt", "rows.Err")
+	}
+	return &res, nil
 }
 
 // execGetRowsStr executes the query referenced by ss in the queries map and returns a pointer to a slice of string and an error.

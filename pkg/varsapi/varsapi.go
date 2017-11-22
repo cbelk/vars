@@ -258,6 +258,28 @@ func GetEmployees() ([]*vars.Employee, error) {
 	return vars.GetEmployees()
 }
 
+// GetClosedVulnerabilities builds/returns a slice of pointers to Vulnerabilities that
+// have a non-NULL 'mitigated' date.
+func GetClosedVulnerabilities() ([]*vars.Vulnerability, error) {
+	var vulns []*vars.Vulnerability
+
+	// Get a slice of IDs associated with open vulnerabilities
+	ids, err := vars.GetClosedVulnIDs()
+	if !vars.IsNilErr(err) {
+		return vulns, err
+	}
+
+	// For each ID get the associated vulnerability object
+	for _, id := range *ids {
+		vuln, err := GetVulnerability(id)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vulns = append(vulns, vuln)
+	}
+	return vulns, nil
+}
+
 // GetOpenVulnerabilities builds/returns a slice of pointers to Vulnerabilities that
 // have a NULL 'mitigated' date.
 func GetOpenVulnerabilities() ([]*vars.Vulnerability, error) {
