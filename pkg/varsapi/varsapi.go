@@ -226,17 +226,22 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// GetEmployee returns an Employee object with the given empid.
+func GetEmployee(eid int64) (*vars.Employee, error) {
+	return vars.GetEmployee(eid)
+}
+
 // GetEmployees returns a slice of pointers to Employee objects.
 func GetEmployees() ([]*vars.Employee, error) {
 	return vars.GetEmployees()
 }
 
-// GetSystem retieves/returns the system with the given id.
+// GetSystem retrieves/returns the system with the given id.
 func GetSystem(sid int64) (*vars.System, error) {
 	return vars.GetSystem(sid)
 }
 
-// GetSystemByName retieves/returns the system with the given name.
+// GetSystemByName retrieves/returns the system with the given name.
 func GetSystemByName(name string) (*vars.System, error) {
 	id, err := vars.GetSystemID(name)
 	if !vars.IsNilErr(err) {
@@ -246,6 +251,7 @@ func GetSystemByName(name string) (*vars.System, error) {
 	return vars.GetSystem(id)
 }
 
+// GetSystems retrieves/returns a slice of pointers to all System objects.
 func GetSystems() ([]*vars.System, error) {
 	return vars.GetSystems()
 }
@@ -341,6 +347,54 @@ func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
 		return &v, err
 	}
 	return GetVulnerability(id)
+}
+
+// UpdateEmployee will update the row in the emp table with the new employee information.
+func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
+	// Get the old employee
+	old, err := GetEmployee(emp.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Compare old employee object to new employee object and update appropriate parts
+	if old.FirstName != emp.FirstName {
+		err = vars.UpdateEmpFname(tx, emp.ID, emp.FirstName)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.LastName != emp.LastName {
+		err = vars.UpdateEmpLname(tx, emp.ID, emp.LastName)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Email != emp.Email {
+		err = vars.UpdateEmpEmail(tx, emp.ID, emp.Email)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
 }
 
 // UpdateSystem updates the edited parts of the system

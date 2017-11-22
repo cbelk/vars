@@ -15,6 +15,7 @@ const (
 	ssCheckSysName
 	ssDeleteRef
 	ssDeleteTicket
+	ssGetEmployee
 	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
@@ -41,6 +42,9 @@ const (
 	ssUpdateCvss
 	ssUpdateCvssLink
 	ssUpdateCorpScore
+	ssUpdateEmpEmail
+	ssUpdateEmpFname
+	ssUpdateEmpLname
 	ssUpdateExploit
 	ssUpdateFinder
 	ssUpdateInitiator
@@ -70,6 +74,7 @@ var (
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
+		ssGetEmployee:      "SELECT firstname, lastname, email FROM emp WHERE empid=$1;",
 		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
 		ssGetEmps:          "SELECT empid, firstname, lastname, email FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
@@ -96,6 +101,9 @@ var (
 		ssUpdateCvss:       "UPDATE impact SET cvss=$1 WHERE vulnid=$2;",
 		ssUpdateCvssLink:   "UPDATE impact SET cvsslink=$1 WHERE vulnid=$2;",
 		ssUpdateCorpScore:  "UPDATE impact SET corpscore=$1 WHERE vulnid=$2;",
+		ssUpdateEmpEmail:   "UPDATE emp SET email=$1 WHERE empid=$2;",
+		ssUpdateEmpFname:   "UPDATE emp SET firstname=$1 WHERE empid=$2;",
+		ssUpdateEmpLname:   "UPDATE emp SET lastname=$1 WHERE empid=$2;",
 		ssUpdateExploit:    "UPDATE exploits SET exploitable=$1, exploit=$2 WHERE vulnid=$3;",
 		ssUpdateFinder:     "UPDATE vuln SET finder=$1 WHERE vulnid=$2;",
 		ssUpdateInitiator:  "UPDATE vuln SET initiator=$1 WHERE vulnid=$2;",
@@ -119,6 +127,7 @@ var (
 		ssActiveSystems:    "GetActiveSystems",
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
+		ssGetEmployee:      "GetEmployee",
 		ssGetEmpID:         "GetEmpID",
 		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
@@ -143,6 +152,9 @@ var (
 		ssUpdateCvss:       "UpdateCvss",
 		ssUpdateCvssLink:   "UpdateCvssLink",
 		ssUpdateCorpScore:  "UpdateCorpScore",
+		ssUpdateEmpEmail:   "UpdateEmpEmail",
+		ssUpdateEmpFname:   "UpdateEmpFname",
+		ssUpdateEmpLname:   "UpdateEmpLname",
 		ssUpdateExploit:    "UpdateExploit",
 		ssUpdateFinder:     "UpdateFinder",
 		ssUpdateInitiator:  "UpdateInitiator",
@@ -243,6 +255,17 @@ func GetEmpIDtx(tx *sql.Tx, first, last, email string) (int64, error) {
 		return id, newErrFromErr(err, execNames[ssGetEmpID])
 	}
 	return id, nil
+}
+
+// GetEmployee returns an Employee object with the given empid.
+func GetEmployee(eid int64) (*Employee, error) {
+	var emp Employee
+	emp.ID = eid
+	err := queries[ssGetEmployee].QueryRow(eid).Scan(&emp.FirstName, &emp.LastName, &emp.Email)
+	if !IsNilErr(err) {
+		return &emp, newErrFromErr(err, execNames[ssGetEmployee])
+	}
+	return &emp, nil
 }
 
 // GetEmployees returns a slice of pointers to Employee objects.
@@ -544,6 +567,21 @@ func UpdateCvssLink(tx *sql.Tx, vid int64, cvssLink VarsNullString) Err {
 // UpdateCorpScore will update the corporate score for the given vulnerability ID.
 func UpdateCorpScore(tx *sql.Tx, vid int64, cscore float32) Err {
 	return execMutation(tx, ssUpdateCorpScore, cscore, vid)
+}
+
+// UpdateEmpEmail will update the email of the employee with the given ID.
+func UpdateEmpEmail(tx *sql.Tx, eid int64, email string) Err {
+	return execMutation(tx, ssUpdateEmpEmail, email, eid)
+}
+
+// UpdateEmpFname will update the first name of the employee with the given ID.
+func UpdateEmpFname(tx *sql.Tx, eid int64, name string) Err {
+	return execMutation(tx, ssUpdateEmpFname, name, eid)
+}
+
+// UpdateEmpLname will update the last name of the employee with the given ID.
+func UpdateEmpLname(tx *sql.Tx, eid int64, name string) Err {
+	return execMutation(tx, ssUpdateEmpLname, name, eid)
 }
 
 // UpdateExploit will update the exploit and the exploitable column for the given vulnerability ID.

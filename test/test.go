@@ -56,6 +56,12 @@ func main() {
 	// Test getting all employees
 	testGetEmployees()
 
+	// Test updating employee
+	testUpdateEmployee(db, 0)
+
+	// Test getting the updated employee
+	testGetEmployee(1)
+
 	// Test updating a system
 	testUpdateSystem(db)
 
@@ -167,6 +173,15 @@ func testGetActiveSystems() {
 	}
 }
 
+func testGetEmployee(eid int64) {
+	fmt.Printf("Retrieving employee with ID %v ...\n", eid)
+	emp, err := varsapi.GetEmployee(eid)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println(emp)
+}
+
 func testGetEmployees() {
 	fmt.Println("Retrieving employees ...")
 	emps, err := varsapi.GetEmployees()
@@ -216,6 +231,21 @@ func testGetVulnerability(vname string) {
 		log.Fatal(err)
 	}
 	fmt.Printf("%v\n", vuln)
+}
+
+func testUpdateEmployee(db *sql.DB, item int64) {
+	nEmp := emps[item]
+	fmt.Printf("Updating employee %v %v ...\n", nEmp.FirstName, nEmp.LastName)
+	id, err := vars.GetEmpID(nEmp.FirstName, nEmp.LastName, nEmp.Email)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	nEmp.ID = id
+	nEmp.Email = fmt.Sprintf("%v.%v@newemail.com", nEmp.FirstName, nEmp.LastName)
+	err = varsapi.UpdateEmployee(db, &nEmp)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
 }
 
 func testUpdateSystem(db *sql.DB) {
