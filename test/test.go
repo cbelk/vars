@@ -161,7 +161,7 @@ func testCloseVulnerability(db *sql.DB, vid int64) {
 		log.Fatal(err)
 	}
 	fmt.Printf("Closing vulnerability: %v ...\n", vuln.Name)
-	now := vars.VarsNullString{sql.NullString{String: time.Now().Format(FORMAT), Valid: true}}
+	now := varsapi.GetVarsNullString(time.Now().Format(FORMAT))
 	err = varsapi.CloseVulnerability(db, vid, now)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)

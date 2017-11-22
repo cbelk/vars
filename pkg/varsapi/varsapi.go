@@ -300,6 +300,16 @@ func GetSystems() ([]*vars.System, error) {
 	return vars.GetSystems()
 }
 
+// GetVarsNullBool creates/returns a VarsNullBool object using the given boolean paramter.
+func GetVarsNullBool(b bool) vars.VarsNullBool {
+	return vars.VarsNullBool{sql.NullBool{Bool: b, Valid: true}}
+}
+
+// GetVarsNullString creates/returns a VarsNullString object using the given string paramter.
+func GetVarsNullString(str string) vars.VarsNullString {
+	return vars.VarsNullString{sql.NullString{String: str, Valid: true}}
+}
+
 // GetVulnerabilities retrieves/returns all vulnerabilities.
 func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 	// Get vulnerabilities (vuln fields)
