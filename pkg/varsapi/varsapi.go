@@ -231,6 +231,26 @@ func GetEmployees() ([]*vars.Employee, error) {
 	return vars.GetEmployees()
 }
 
+func GetOpenVulnerabilities() ([]*vars.Vulnerability, error) {
+	var vulns []*vars.Vulnerability
+
+	// Get a slice of IDs associated with open vulnerabilities
+	ids, err := vars.GetOpenVulnIDs()
+	if !vars.IsNilErr(err) {
+		return vulns, err
+	}
+
+	// For each ID get the associated vulnerability object
+	for _, id := range *ids {
+		vuln, err := GetVulnerability(id)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vulns = append(vulns, vuln)
+	}
+	return vulns, nil
+}
+
 // GetSystem retrieves/returns the system with the given id.
 func GetSystem(sid int64) (*vars.System, error) {
 	return vars.GetSystem(sid)

@@ -93,6 +93,9 @@ func main() {
 	testAddAffected(db, &vulns[0], &systems[0])
 	testAddAffected(db, &vulns[1], &systems[2])
 
+	// Test getting open VAs
+	testGetOpenVAs()
+
 	fmt.Println("\n\nDone!")
 }
 
@@ -190,6 +193,18 @@ func testGetEmployees() {
 	}
 	for _, emp := range emps {
 		fmt.Printf("Struct for %v %v:\n%v\n", emp.FirstName, emp.LastName, emp)
+	}
+}
+
+func testGetOpenVAs() {
+	fmt.Println("Retrieving open VAs ...")
+	vulns, err := varsapi.GetOpenVulnerabilities()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Println("Open vulnerabilities are:")
+	for _, vuln := range vulns {
+		fmt.Println(*vuln)
 	}
 }
 

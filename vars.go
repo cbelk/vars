@@ -19,6 +19,7 @@ const (
 	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
+	ssGetOpenVulnIDs
 	ssGetReferences
 	ssGetSystem
 	ssGetSystems
@@ -78,6 +79,7 @@ var (
 		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
 		ssGetEmps:          "SELECT empid, firstname, lastname, email FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
+		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
 		ssGetSystems:       "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
@@ -131,6 +133,7 @@ var (
 		ssGetEmpID:         "GetEmpID",
 		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
+		ssGetOpenVulnIDs:   "GetOpenVulnIDs",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
 		ssGetSystems:       "GetSystems",
@@ -298,6 +301,27 @@ func GetExploit(vid int64) (VarsNullString, VarsNullBool, error) {
 		return exploit, exploitable, newErrFromErr(err, execNames[ssGetExploit])
 	}
 	return exploit, exploitable, nil
+}
+
+// GetOpenVulnIDs returns a pointer to a slice of vulnerability IDs that do not have a mitigated date.
+func GetOpenVulnIDs() (*[]int64, error) {
+	var ids []int64
+	rows, err := queries[ssGetOpenVulnIDs].Query()
+	if err != nil {
+		return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs])
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs], "rows.Scan")
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return &ids, newErrFromErr(err, execNames[ssGetOpenVulnIDs], "rows.Err")
+	}
+	return &ids, nil
 }
 
 // GetReferences returns a pointer to a slice of urls associated with the vulnid.
@@ -708,7 +732,7 @@ func execGetRowsStr(ss sqlStatement, args ...interface{}) (*[]string, error) {
 		res = append(res, r)
 	}
 	if err := rows.Err(); err != nil {
-		return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr")
+		return &res, newErrFromErr(err, execNames[ss], "execGetRowsStr", "rows.Err")
 	}
 	return &res, nil
 }
@@ -729,7 +753,7 @@ func execGetRowsSys(ss sqlStatement, args ...interface{}) ([]*System, error) {
 		res = append(res, &r)
 	}
 	if err := rows.Err(); err != nil {
-		return res, newErrFromErr(err, execNames[ss], "execGetRowsSys")
+		return res, newErrFromErr(err, execNames[ss], "execGetRowsSys", "rows.Err")
 	}
 	return res, nil
 }
