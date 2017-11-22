@@ -193,6 +193,33 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	return nil
 }
 
+// CloseVulnerability sets the 'mitigated' date equal to the date parameter for the given vulnid.
+func CloseVulnerability(db *sql.DB, vid int64, date vars.VarsNullString) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateMitDate(tx, vid, date)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // DecommissionSystem sets the state of the given system to decommissioned.
 func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function

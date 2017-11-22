@@ -5,12 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/cbelk/vars"
 	"github.com/cbelk/vars/pkg/varsapi"
 )
 
 var (
+	FORMAT  = "2006-01-02"
 	systems = []vars.System{
 		{Name: "mtx101", Type: "server", OpSys: "ubuntu 1604", Location: "corporate", Description: "Mail relay server"},
 		{Name: "mtx102", Type: "router", OpSys: "NA", Location: "hosted", Description: "Some other server"},
@@ -93,6 +95,9 @@ func main() {
 	testAddAffected(db, &vulns[0], &systems[0])
 	testAddAffected(db, &vulns[1], &systems[2])
 
+	// Test closing a VA
+	testCloseVulnerability(db, vulns[0].ID)
+
 	// Test getting open VAs
 	testGetOpenVAs()
 
@@ -147,6 +152,19 @@ func testAddVulnerabilities(db *sql.DB) {
 		if !vars.IsNilErr(err) {
 			log.Fatal(err)
 		}
+	}
+}
+
+func testCloseVulnerability(db *sql.DB, vid int64) {
+	vuln, err := varsapi.GetVulnerability(vid)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	fmt.Printf("Closing vulnerability: %v ...\n", vuln.Name)
+	now := vars.VarsNullString{sql.NullString{String: time.Now().Format(FORMAT), Valid: true}}
+	err = varsapi.CloseVulnerability(db, vid, now)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
 	}
 }
 
