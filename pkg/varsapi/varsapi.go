@@ -231,6 +231,8 @@ func GetEmployees() ([]*vars.Employee, error) {
 	return vars.GetEmployees()
 }
 
+// GetOpenVulnerabilities builds/returns a slice of pointers to Vulnerabilities that
+// have a NULL 'mitigated' date.
 func GetOpenVulnerabilities() ([]*vars.Vulnerability, error) {
 	var vulns []*vars.Vulnerability
 
