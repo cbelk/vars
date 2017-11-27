@@ -220,6 +220,12 @@ func CloseVulnerability(db *sql.DB, vid int64, date vars.VarsNullString) error {
 	return nil
 }
 
+// ConnectDB gets the VARS config object and calls the VARS function to set up the database connection.
+func ConnectDB() (*sql.DB, error) {
+	conf := GetConfig()
+	return vars.ConnectDB(&conf)
+}
+
 // DecommissionSystem sets the state of the given system to decommissioned.
 func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
@@ -278,6 +284,11 @@ func GetClosedVulnerabilities() ([]*vars.Vulnerability, error) {
 		vulns = append(vulns, vuln)
 	}
 	return vulns, nil
+}
+
+// GetConfig retrieves/returns the Config object that was created in VARS.
+func GetConfig() vars.Config {
+	return vars.Conf
 }
 
 // GetOpenVulnerabilities builds/returns a slice of pointers to Vulnerabilities that
@@ -423,6 +434,11 @@ func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
 		return &v, err
 	}
 	return GetVulnerability(id)
+}
+
+// ReadConfig passes the config string to vars.ReadConfig to create the Config object.
+func ReadConfig(config string) error {
+	return vars.ReadConfig(config)
 }
 
 // UpdateEmployee will update the row in the emp table with the new employee information.

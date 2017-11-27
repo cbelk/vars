@@ -35,13 +35,14 @@ func main() {
 	flag.Parse()
 
 	// Test reading in config and connecting to DB
-	err := vars.ReadConfig(*config)
+	err := varsapi.ReadConfig(*config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Config is:")
-	fmt.Println(vars.Conf, "\n\n")
-	db, err := vars.ConnectDB(&vars.Conf)
+	fmt.Println(varsapi.GetConfig(), "\n\n")
+	//db, err := vars.ConnectDB(&vars.Conf)
+	db, err := varsapi.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
 	}
