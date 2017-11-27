@@ -220,6 +220,11 @@ func CloseVulnerability(db *sql.DB, vid int64, date vars.VarsNullString) error {
 	return nil
 }
 
+// CloseDB is a way to close connections to the database safely
+func CloseDB(db *sql.DB) {
+	vars.CloseDB(db)
+}
+
 // ConnectDB gets the VARS config object and calls the VARS function to set up the database connection.
 func ConnectDB() (*sql.DB, error) {
 	conf := GetConfig()
