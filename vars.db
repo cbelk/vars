@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.5.6
--- Dumped by pg_dump version 9.5.6
+-- Dumped from database version 9.5.10
+-- Dumped by pg_dump version 9.5.10
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -126,9 +126,9 @@ ALTER TABLE exploits OWNER TO vars;
 
 CREATE TABLE impact (
     vulnid integer NOT NULL,
-    cvss decimal NOT NULL,
+    cvss numeric NOT NULL,
     cvsslink text,
-    corpscore decimal NOT NULL
+    corpscore numeric NOT NULL
 );
 
 
@@ -145,6 +145,19 @@ CREATE TABLE ref (
 
 
 ALTER TABLE ref OWNER TO vars;
+
+--
+-- Name: sessions; Type: TABLE; Schema: public; Owner: vars
+--
+
+CREATE TABLE sessions (
+    token text NOT NULL,
+    data bytea NOT NULL,
+    expiry timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE sessions OWNER TO vars;
 
 --
 -- Name: systems; Type: TABLE; Schema: public; Owner: vars
@@ -313,6 +326,14 @@ ALTER TABLE ONLY ref
 
 
 --
+-- Name: sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (token);
+
+
+--
 -- Name: systems_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
 --
 
@@ -334,6 +355,13 @@ ALTER TABLE ONLY tickets
 
 ALTER TABLE ONLY vuln
     ADD CONSTRAINT vuln_pkey PRIMARY KEY (vulnid);
+
+
+--
+-- Name: sessions_expiry_idx; Type: INDEX; Schema: public; Owner: vars
+--
+
+CREATE INDEX sessions_expiry_idx ON sessions USING btree (expiry);
 
 
 --
