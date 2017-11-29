@@ -43,15 +43,18 @@ echo "localhost:5432:$dbname:$dbuser:$pswd" > $tmp
 ## Database Setup ##
 
 # Create database
-echo ' [+] Creating database ...'
+echo '[+] Creating database ...'
 sudo -u "$dbuser" createdb -O "$dbuser" "$dbname"
 
 # Feed SQL script to psql
 sudo -u "$dbuser" psql < $(pwd)/vars.db >> db-creation.out 2>&1
 
+# Create session crypto key
+key="$(head /dev/urandom | tr -dc '[:alnum:]' | head -c 32)"
+
 # Setup vars config
 mkdir /etc/vars
 #cp `pwd`/vars.conf /etc/vars
-echo -e "{\n\t\"user\" : \"$dbuser\",\n\t\"pass\" : \"$pswd\",\n\t\"name\" : \"$dbname\",\n\t\"host\" : \"localhost\",\n\t\"port\" : \"5432\"\n}" > /etc/vars/vars.conf
+echo -e "{\n\t\"user\" : \"$dbuser\",\n\t\"pass\" : \"$pswd\",\n\t\"name\" : \"$dbname\",\n\t\"host\" : \"localhost\",\n\t\"port\" : \"5432\",\n\t\"skey\" : \"$key\"\n}" > /etc/vars/vars.conf
 chgrp "$dbuser" /etc/vars/vars.conf
 chmod 640 /etc/vars/vars.conf

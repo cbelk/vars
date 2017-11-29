@@ -16,6 +16,7 @@ type Config struct {
 	User string
 	Pass string
 	Name string
+	Skey string
 }
 
 // Conf will hold the VARS configuration.
