@@ -41,7 +41,6 @@ func main() {
 	}
 	fmt.Println("Config is:")
 	fmt.Println(varsapi.GetConfig(), "\n\n")
-	//db, err := vars.ConnectDB(&vars.Conf)
 	db, err := varsapi.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
