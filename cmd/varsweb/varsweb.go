@@ -37,7 +37,7 @@ func main() {
 	router.GET("/", LoginGet)
 	router.POST("/", LoginPost)
 
-	log.Fatal(http.ListenAndServe(":80", router))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
 }
 
 // LoginGet serves the login page.
