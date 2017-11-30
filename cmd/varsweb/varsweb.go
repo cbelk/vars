@@ -1,84 +1,68 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
-	//	"fmt"
-	"io/ioutil"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/cbelk/vars"
 	"github.com/cbelk/vars/pkg/varsapi"
+	"github.com/julienschmidt/httprouter"
 )
 
 var db *sql.DB
+var authenticate func(string, string) (bool, error)
+
+const webroot string = "/var/www/html"
 
 func main() {
-	// Read in the configuration
-	config := os.Getenv("VARS_CONFIG")
-	if config == "" {
-		log.Fatal("VarsWeb: VARS_CONFIG not set.")
-	}
-	err := vars.ReadConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Read in the configurations
+	ReadVarsConfig()
+	ReadWebConfig()
+
+	// Load the authentication plugin
+	auth = LoadAuth()
 
 	// Start the database connection
-	db, err = vars.ConnectDB(&vars.Conf)
+	db, err := varsapi.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer vars.CloseDB(db)
+	defer varsapi.CloseDB(db)
 
-	// Start handling request
-	handleRequest()
+	// Set paths
+	router := httprouter.New()
+	router.GET("/", LoginGet)
+	router.POST("/", LoginPost)
+
+	log.Fatal(http.ListenAndServe(":80", router))
 }
 
-func handleRequest() {
-	http.HandleFunc("/vuln/", serveVuln)
-
-	err := http.ListenAndServe(":1843", nil)
+// LoginGet serves the login page.
+func LoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	file, err := os.Open(fmt.Sprintf("%s/login.html", webroot))
 	if err != nil {
-		log.Fatal("Varsweb: ", err)
+		w.WriteHeader(404)
 	}
+	defer file.Close()
+	w.Header().Add("Content-Type", "text/html")
+	br := bufio.NewReader(file)
+	br.WriteTo(w)
 }
 
-func serveVuln(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/vuln/"):]
-	switch m := r.Method; m {
-	case "GET":
-		// Get vuln {id}
-		b, err := varsapi.GetVulnerability(id)
-		if err != nil {
-			log.Printf("varsweb: serveVuln: GET: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			break
-		}
-		w.Header().Add("Content-Type", "application/json")
-		w.Write(b)
-	case "PUT":
-		// Create vuln {id}
-		data, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("varsweb: serveVuln: PUT: ReadAll: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			break
-		}
-		err = varsapi.AddVulnerability(db, data)
-		if err != nil {
-			log.Printf("varsweb: serveVuln: PUT: AddVulnerability: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			break
-		}
-		w.WriteHeader(http.StatusOK)
-	case "POST":
-		// Update vuln {id}
-	case "DELETE":
-		// Delete vuln {id}
-	default:
-		// Not a valid endpoint
-		w.WriteHeader(http.StatusBadRequest)
+// LoginPost uses the Authenticate function of the auth plugin to validate the user credentials.
+func LoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	u := r.FormValue("username")
+	p := r.FormValue("password")
+	authed, err := authenticate(u, p)
+	if err != nil {
+		w.WriteHeader(404)
+	}
+	if authed {
+		w.Write([]byte("Sucessful login"))
+	} else {
+		w.Write([]byte("Invalid credentials"))
 	}
 }
