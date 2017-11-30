@@ -60,19 +60,6 @@ CREATE TABLE dates (
 ALTER TABLE dates OWNER TO vars;
 
 --
--- Name: docs; Type: TABLE; Schema: public; Owner: vars
---
-
-CREATE TABLE docs (
-    vulnid integer NOT NULL,
-    docpath text NOT NULL,
-    dockey text NOT NULL
-);
-
-
-ALTER TABLE docs OWNER TO vars;
-
---
 -- Name: emp; Type: TABLE; Schema: public; Owner: vars
 --
 
@@ -273,14 +260,6 @@ ALTER TABLE ONLY dates
 
 
 --
--- Name: docs_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
---
-
-ALTER TABLE ONLY docs
-    ADD CONSTRAINT docs_pkey PRIMARY KEY (vulnid, docpath);
-
-
---
 -- Name: emp_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
 --
 
@@ -358,14 +337,6 @@ ALTER TABLE ONLY affected
 
 ALTER TABLE ONLY dates
     ADD CONSTRAINT dates_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
-
-
---
--- Name: docs_vulnid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vars
---
-
-ALTER TABLE ONLY docs
-    ADD CONSTRAINT docs_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
 
 
 --
