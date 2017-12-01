@@ -47,6 +47,7 @@ const (
 	ssUpdateCorpScore
 	ssUpdateEmpEmail
 	ssUpdateEmpFname
+	ssUpdateEmpLevel
 	ssUpdateEmpLname
 	ssUpdateEmpUname
 	ssUpdateExploit
@@ -79,9 +80,9 @@ var (
 		ssDeleteAffected:   "DELETE FROM affected WHERE vulnid=$1 AND sysid=$2;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
-		ssGetEmployee:      "SELECT firstname, lastname, email, username FROM emp WHERE empid=$1;",
+		ssGetEmployee:      "SELECT firstname, lastname, email, username, level FROM emp WHERE empid=$1;",
 		ssGetEmpID:         "SELECT empid FROM emp WHERE username=$1;",
-		ssGetEmps:          "SELECT empid, firstname, lastname, email, username FROM emp;",
+		ssGetEmps:          "SELECT empid, firstname, lastname, email, username, level FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetClosedVulnIDs: "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
 		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
@@ -96,7 +97,7 @@ var (
 		ssGetVulnID:        "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:   "INSERT INTO affected (vulnid, sysid, mitigated) VALUES ($1, $2, $3);",
 		ssInsertDates:      "INSERT INTO dates (vulnid, published, initiated, mitigated) VALUES ($1, $2, $3, $4);",
-		ssInsertEmployee:   "INSERT INTO emp (firstname, lastname, email, username) VALUES ($1, $2, $3, $4);",
+		ssInsertEmployee:   "INSERT INTO emp (firstname, lastname, email, username, level) VALUES ($1, $2, $3, $4, $5);",
 		ssInsertExploit:    "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertImpact:     "INSERT INTO impact (vulnid, cvss, cvsslink, corpscore) VALUES ($1, $2, $3, $4);",
 		ssInsertRefers:     "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
@@ -110,6 +111,7 @@ var (
 		ssUpdateCorpScore:  "UPDATE impact SET corpscore=$1 WHERE vulnid=$2;",
 		ssUpdateEmpEmail:   "UPDATE emp SET email=$1 WHERE empid=$2;",
 		ssUpdateEmpFname:   "UPDATE emp SET firstname=$1 WHERE empid=$2;",
+		ssUpdateEmpLevel:   "UPDATE emp SET level=$1 WHERE empid=$2;",
 		ssUpdateEmpLname:   "UPDATE emp SET lastname=$1 WHERE empid=$2;",
 		ssUpdateEmpUname:   "UPDATE emp SET username=$1 WHERE empid=$2;",
 		ssUpdateExploit:    "UPDATE exploits SET exploitable=$1, exploit=$2 WHERE vulnid=$3;",
@@ -165,6 +167,7 @@ var (
 		ssUpdateCorpScore:  "UpdateCorpScore",
 		ssUpdateEmpEmail:   "UpdateEmpEmail",
 		ssUpdateEmpFname:   "UpdateEmpFname",
+		ssUpdateEmpLevel:   "UpdateEmpLevel",
 		ssUpdateEmpLname:   "UpdateEmpLname",
 		ssUpdateEmpUname:   "UpdateEmpUname",
 		ssUpdateExploit:    "UpdateExploit",
@@ -195,6 +198,7 @@ type Employee struct {
 	LastName  string
 	Email     string
 	UserName  string
+	Level     int
 }
 
 // System holds information about systems in the environment.
@@ -279,7 +283,7 @@ func GetEmpIDtx(tx *sql.Tx, username string) (int64, error) {
 func GetEmployee(eid int64) (*Employee, error) {
 	var emp Employee
 	emp.ID = eid
-	err := queries[ssGetEmployee].QueryRow(eid).Scan(&emp.FirstName, &emp.LastName, &emp.Email, &emp.UserName)
+	err := queries[ssGetEmployee].QueryRow(eid).Scan(&emp.FirstName, &emp.LastName, &emp.Email, &emp.UserName, &emp.Level)
 	if !IsNilErr(err) {
 		return &emp, newErrFromErr(err, execNames[ssGetEmployee])
 	}
@@ -296,7 +300,7 @@ func GetEmployees() ([]*Employee, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var e Employee
-		if err := rows.Scan(&e.ID, &e.FirstName, &e.LastName, &e.Email, &e.UserName); err != nil {
+		if err := rows.Scan(&e.ID, &e.FirstName, &e.LastName, &e.Email, &e.UserName, &e.Level); err != nil {
 			return emps, newErrFromErr(err, execNames[ssGetEmps], "rows.Scan")
 		}
 		emps = append(emps, &e)
@@ -458,8 +462,8 @@ func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) err
 }
 
 // InsertEmployee inserts the employee's first name, last name, and email.
-func InsertEmployee(tx *sql.Tx, first, last, email, username string) error {
-	return execMutation(tx, ssInsertEmployee, first, last, email, username)
+func InsertEmployee(tx *sql.Tx, first, last, email, username string, level int) error {
+	return execMutation(tx, ssInsertEmployee, first, last, email, username, level)
 }
 
 // InsertImpact inserts the CVSS score, Corpscore, and CVSSlink.
@@ -605,6 +609,11 @@ func UpdateEmpEmail(tx *sql.Tx, eid int64, email string) Err {
 // UpdateEmpFname will update the first name of the employee with the given ID.
 func UpdateEmpFname(tx *sql.Tx, eid int64, name string) Err {
 	return execMutation(tx, ssUpdateEmpFname, name, eid)
+}
+
+// UpdateEmpLevel will update the level of the employee with the given ID.
+func UpdateEmpLevel(tx *sql.Tx, eid int64, level int) Err {
+	return execMutation(tx, ssUpdateEmpLevel, level, eid)
 }
 
 // UpdateEmpLname will update the last name of the employee with the given ID.

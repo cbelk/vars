@@ -69,7 +69,8 @@ CREATE TABLE emp (
     firstname character varying(50) NOT NULL,
     lastname character varying(50) NOT NULL,
     email text NOT NULL,
-    username text NOT NULL
+    username text NOT NULL,
+    level integer NOT NULL
 );
 
 

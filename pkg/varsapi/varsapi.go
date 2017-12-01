@@ -49,7 +49,7 @@ func AddEmployee(db *sql.DB, emp *vars.Employee) error {
 	}()
 
 	// Add employee
-	err = vars.InsertEmployee(tx, emp.FirstName, emp.LastName, emp.Email, emp.UserName)
+	err = vars.InsertEmployee(tx, emp.FirstName, emp.LastName, emp.Email, emp.UserName, emp.Level)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -552,6 +552,12 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	}
 	if old.UserName != emp.UserName {
 		err = vars.UpdateEmpUname(tx, emp.ID, emp.UserName)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Level != emp.Level {
+		err = vars.UpdateEmpLevel(tx, emp.ID, emp.Level)
 		if !vars.IsNilErr(err) {
 			return err
 		}
