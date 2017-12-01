@@ -287,9 +287,19 @@ func DeleteAffected(db *sql.DB, vid, sid int64) error {
 	return nil
 }
 
-// GetEmployee returns an Employee object with the given empid.
-func GetEmployee(eid int64) (*vars.Employee, error) {
+// GetEmployeeByID returns an Employee object with the given empid.
+func GetEmployeeByID(eid int64) (*vars.Employee, error) {
 	return vars.GetEmployee(eid)
+}
+
+// GetEmployeeByUsername returns an Employee object with the given username.
+func GetEmployeeByUsername(username string) (*vars.Employee, error) {
+	id, err := vars.GetEmpID(username)
+	if !vars.IsNilErr(err) {
+		var emp vars.Employee
+		return &emp, err
+	}
+	return vars.GetEmployee(id)
 }
 
 // GetEmployees returns a slice of pointers to Employee objects.
@@ -504,7 +514,7 @@ func UpdateAffected(db *sql.DB, vid, sid int64, mit bool) error {
 // UpdateEmployee will update the row in the emp table with the new employee information.
 func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	// Get the old employee
-	old, err := GetEmployee(emp.ID)
+	old, err := GetEmployeeByID(emp.ID)
 	if !vars.IsNilErr(err) {
 		return err
 	}
