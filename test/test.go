@@ -19,10 +19,10 @@ var (
 		{Name: "mtx103", Type: "server", OpSys: "windows 2012", Location: "hosted", Description: "Some other server again"},
 	}
 	emps = []vars.Employee{
-		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it"},
-		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it"},
-		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it"},
-		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it"},
+		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it", UserName: "bbarker"},
+		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it", UserName: "aturing"},
+		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it", UserName: "afranklin"},
+		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it", UserName: "pmonch"},
 	}
 	vulns = []vars.Vulnerability{
 		{Name: "DirtyCOW", Cve: vars.VarsNullString{sql.NullString{String: "CVE-2016-5195", Valid: true}}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
@@ -94,6 +94,9 @@ func main() {
 	// Test adding affected systems
 	testAddAffected(db, &vulns[0], &systems[0])
 	testAddAffected(db, &vulns[1], &systems[2])
+
+	// Test updating affected systems
+	testUpdateAffected(db, &vulns[0], &systems[0])
 
 	// Test closing a VA
 	testCloseVulnerability(db, vulns[0].ID)
@@ -279,10 +282,27 @@ func testGetVulnerability(vname string) {
 	fmt.Printf("%v\n", vuln)
 }
 
+func testUpdateAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) {
+	fmt.Printf("\nUpdating the mitigated status to true for vulnerability %v affecting system %v ...\n", vuln.Name, sys.Name)
+	sid, err := vars.GetSystemID(sys.Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	vid, err := vars.GetVulnID(vuln.Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+
+	err = varsapi.UpdateAffected(db, vid, sid, true)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+}
+
 func testUpdateEmployee(db *sql.DB, item int64) {
 	nEmp := emps[item]
 	fmt.Printf("Updating employee %v %v ...\n", nEmp.FirstName, nEmp.LastName)
-	id, err := vars.GetEmpID(nEmp.FirstName, nEmp.LastName, nEmp.Email)
+	id, err := vars.GetEmpID(nEmp.UserName)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
