@@ -8,12 +8,17 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/alexedwards/scs"
+	"github.com/cbelk/vars"
 	"github.com/cbelk/vars/pkg/varsapi"
 	"github.com/julienschmidt/httprouter"
 )
 
-var db *sql.DB
-var authenticate func(string, string) (bool, error)
+var (
+	db             *sql.DB
+	authenticate   func(string, string) (bool, error)
+	sessionManager *scs.Manager
+)
 
 const webroot string = "/var/www/html"
 
@@ -23,7 +28,7 @@ func main() {
 	ReadWebConfig()
 
 	// Load the authentication plugin
-	auth = LoadAuth()
+	authenticate = LoadAuth()
 
 	// Start the database connection
 	db, err := varsapi.ConnectDB()
@@ -32,12 +37,31 @@ func main() {
 	}
 	defer varsapi.CloseDB(db)
 
+	// Create Session Manager
+	sessionManager = scs.NewCookieManager(webConf.Skey)
+
 	// Set paths
 	router := httprouter.New()
 	router.GET("/", LoginGet)
 	router.POST("/", LoginPost)
+	router.GET("/session", DisplaySession)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
+}
+
+// *** used for testing -- REMOVE ***
+func DisplaySession(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	var emp vars.Employee
+	session := sessionManager.Load(r)
+	authed, err := session.GetBool("authed")
+	if err != nil {
+		w.WriteHeader(500)
+	}
+	err = session.GetObject("employee", &emp)
+	if err != nil {
+		w.WriteHeader(500)
+	}
+	w.Write([]byte(fmt.Sprintf("authed: %v\nempObject: %v\n", authed, emp)))
 }
 
 // LoginGet serves the login page.
@@ -60,9 +84,31 @@ func LoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if err != nil {
 		w.WriteHeader(404)
 	}
+	session := sessionManager.Load(r)
 	if authed {
+		emp, err := varsapi.GetEmployeeByUsername(u)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+		err = session.PutBool(w, "authed", true)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+		err = session.PutObject(w, "employee", emp)
+		if err != nil {
+			w.WriteHeader(500)
+		}
 		w.Write([]byte("Sucessful login"))
 	} else {
+		err = session.PutBool(w, "authed", false)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+		var emp vars.Employee
+		err = session.PutObject(w, "employee", emp)
+		if err != nil {
+			w.WriteHeader(500)
+		}
 		w.Write([]byte("Invalid credentials"))
 	}
 }
