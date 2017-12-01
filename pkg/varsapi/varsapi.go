@@ -21,7 +21,7 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	}()
 
 	// Add affected
-	err = vars.InsertAffected(tx, vuln.ID, sys.ID)
+	err = vars.InsertAffected(tx, vuln.ID, sys.ID, false)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -49,13 +49,13 @@ func AddEmployee(db *sql.DB, emp *vars.Employee) error {
 	}()
 
 	// Add employee
-	err = vars.InsertEmployee(tx, emp.FirstName, emp.LastName, emp.Email)
+	err = vars.InsertEmployee(tx, emp.FirstName, emp.LastName, emp.Email, emp.UserName)
 	if !vars.IsNilErr(err) {
 		return err
 	}
 
 	// Update the employee ID
-	id, err := vars.GetEmpIDtx(tx, emp.FirstName, emp.LastName, emp.Email)
+	id, err := vars.GetEmpIDtx(tx, emp.UserName)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -259,6 +259,34 @@ func DecommissionSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// DeleteAffected deletes the row (vid, sid) from affected.
+func DeleteAffected(db *sql.DB, vid, sid int64) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete the row (vid, sid) from affected.
+	err = vars.DeleteAffected(tx, vid, sid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // GetEmployee returns an Employee object with the given empid.
 func GetEmployee(eid int64) (*vars.Employee, error) {
 	return vars.GetEmployee(eid)
@@ -446,6 +474,33 @@ func ReadConfig(config string) error {
 	return vars.ReadConfig(config)
 }
 
+// UpdateAffected will update the mitigated status of the row (vid, sid).
+func UpdateAffected(db *sql.DB, vid, sid int64, mit bool) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateAffected(tx, vid, sid, mit)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateEmployee will update the row in the emp table with the new employee information.
 func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	// Get the old employee
@@ -481,6 +536,12 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	}
 	if old.Email != emp.Email {
 		err = vars.UpdateEmpEmail(tx, emp.ID, emp.Email)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.UserName != emp.UserName {
+		err = vars.UpdateEmpUname(tx, emp.ID, emp.UserName)
 		if !vars.IsNilErr(err) {
 			return err
 		}

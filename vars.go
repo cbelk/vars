@@ -13,6 +13,7 @@ const (
 	ssActiveSystems sqlStatement = iota
 	ssCheckVulnName
 	ssCheckSysName
+	ssDeleteAffected
 	ssDeleteRef
 	ssDeleteTicket
 	ssGetEmployee
@@ -47,6 +48,7 @@ const (
 	ssUpdateEmpEmail
 	ssUpdateEmpFname
 	ssUpdateEmpLname
+	ssUpdateEmpUname
 	ssUpdateExploit
 	ssUpdateFinder
 	ssUpdateInitiator
@@ -74,11 +76,12 @@ var (
 		ssActiveSystems:    "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems WHERE state='active';",
 		ssCheckVulnName:    "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
+		ssDeleteAffected:   "DELETE FROM affected WHERE vulnid=$1 AND sysid=$2;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
-		ssGetEmployee:      "SELECT firstname, lastname, email FROM emp WHERE empid=$1;",
-		ssGetEmpID:         "SELECT empid FROM emp WHERE firstname=$1 AND lastname=$2 AND email=$3;",
-		ssGetEmps:          "SELECT empid, firstname, lastname, email FROM emp;",
+		ssGetEmployee:      "SELECT firstname, lastname, email, username FROM emp WHERE empid=$1;",
+		ssGetEmpID:         "SELECT empid FROM emp WHERE username=$1;",
+		ssGetEmps:          "SELECT empid, firstname, lastname, email, username FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetClosedVulnIDs: "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
 		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
@@ -91,16 +94,16 @@ var (
 		ssGetVulns:         "SELECT vulnid, vulnname, cve, finder, initiator, summary, test, mitigation FROM vuln;",
 		ssGetVulnDates:     "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:        "SELECT vulnid FROM vuln WHERE vulnname=$1;",
-		ssInsertAffected:   "INSERT INTO affected (vulnid, sysid) VALUES ($1, $2);",
+		ssInsertAffected:   "INSERT INTO affected (vulnid, sysid, mitigated) VALUES ($1, $2, $3);",
 		ssInsertDates:      "INSERT INTO dates (vulnid, published, initiated, mitigated) VALUES ($1, $2, $3, $4);",
-		ssInsertEmployee:   "INSERT INTO emp (firstname, lastname, email) VALUES ($1, $2, $3);",
+		ssInsertEmployee:   "INSERT INTO emp (firstname, lastname, email, username) VALUES ($1, $2, $3, $4);",
 		ssInsertExploit:    "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
 		ssInsertImpact:     "INSERT INTO impact (vulnid, cvss, cvsslink, corpscore) VALUES ($1, $2, $3, $4);",
 		ssInsertRefers:     "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:     "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
 		ssInsertTicket:     "INSERT INTO tickets (vulnid, ticket) VALUES ($1, $2);",
 		ssInsertVuln:       "INSERT INTO vuln (vulnname, cve, finder, initiator, summary, test, mitigation) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING vulnid;",
-		ssUpdateAffected:   "UPDATE affected SET sysid=$1 WHERE vulnid=$2 AND sysid=$3;",
+		ssUpdateAffected:   "UPDATE affected SET mitigated=$1 WHERE vulnid=$2 AND sysid=$3;",
 		ssUpdateCve:        "UPDATE vuln SET cve=$1 WHERE vulnid=$2;",
 		ssUpdateCvss:       "UPDATE impact SET cvss=$1 WHERE vulnid=$2;",
 		ssUpdateCvssLink:   "UPDATE impact SET cvsslink=$1 WHERE vulnid=$2;",
@@ -108,6 +111,7 @@ var (
 		ssUpdateEmpEmail:   "UPDATE emp SET email=$1 WHERE empid=$2;",
 		ssUpdateEmpFname:   "UPDATE emp SET firstname=$1 WHERE empid=$2;",
 		ssUpdateEmpLname:   "UPDATE emp SET lastname=$1 WHERE empid=$2;",
+		ssUpdateEmpUname:   "UPDATE emp SET username=$1 WHERE empid=$2;",
 		ssUpdateExploit:    "UPDATE exploits SET exploitable=$1, exploit=$2 WHERE vulnid=$3;",
 		ssUpdateFinder:     "UPDATE vuln SET finder=$1 WHERE vulnid=$2;",
 		ssUpdateInitiator:  "UPDATE vuln SET initiator=$1 WHERE vulnid=$2;",
@@ -129,6 +133,7 @@ var (
 	}
 	execNames = map[sqlStatement]string{
 		ssActiveSystems:    "GetActiveSystems",
+		ssDeleteAffected:   "DeleteAffected",
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
 		ssGetEmployee:      "GetEmployee",
@@ -161,6 +166,7 @@ var (
 		ssUpdateEmpEmail:   "UpdateEmpEmail",
 		ssUpdateEmpFname:   "UpdateEmpFname",
 		ssUpdateEmpLname:   "UpdateEmpLname",
+		ssUpdateEmpUname:   "UpdateEmpUname",
 		ssUpdateExploit:    "UpdateExploit",
 		ssUpdateFinder:     "UpdateFinder",
 		ssUpdateInitiator:  "UpdateInitiator",
@@ -188,6 +194,7 @@ type Employee struct {
 	FirstName string
 	LastName  string
 	Email     string
+	UserName  string
 }
 
 // System holds information about systems in the environment.
@@ -228,6 +235,11 @@ type Vulnerability struct {
 	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
 }
 
+// DeleteAffected deletes the row in the affected table with the given vulnid and sysid.
+func DeleteAffected(tx *sql.Tx, vid, sid int64) Err {
+	return execMutation(tx, ssDeleteAffected, vid, sid)
+}
+
 // DeleteRef deletes the row in the ref table with the given vulnid and url.
 func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
 	return execMutation(tx, ssDeleteRef, vid, ref)
@@ -244,9 +256,9 @@ func GetActiveSystems() ([]*System, error) {
 }
 
 // GetEmpID returns the empid associated with the employee.
-func GetEmpID(first, last, email string) (int64, error) {
+func GetEmpID(username string) (int64, error) {
 	var id int64
-	err := queries[ssGetEmpID].QueryRow(first, last, email).Scan(&id)
+	err := queries[ssGetEmpID].QueryRow(username).Scan(&id)
 	if err != nil {
 		return id, newErrFromErr(err, execNames[ssGetEmpID])
 	}
@@ -254,9 +266,9 @@ func GetEmpID(first, last, email string) (int64, error) {
 }
 
 // GetEmpIDtx returns the empid associated with the employee.
-func GetEmpIDtx(tx *sql.Tx, first, last, email string) (int64, error) {
+func GetEmpIDtx(tx *sql.Tx, username string) (int64, error) {
 	var id int64
-	err := tx.Stmt(queries[ssGetEmpID]).QueryRow(first, last, email).Scan(&id)
+	err := tx.Stmt(queries[ssGetEmpID]).QueryRow(username).Scan(&id)
 	if err != nil {
 		return id, newErrFromErr(err, execNames[ssGetEmpID])
 	}
@@ -267,7 +279,7 @@ func GetEmpIDtx(tx *sql.Tx, first, last, email string) (int64, error) {
 func GetEmployee(eid int64) (*Employee, error) {
 	var emp Employee
 	emp.ID = eid
-	err := queries[ssGetEmployee].QueryRow(eid).Scan(&emp.FirstName, &emp.LastName, &emp.Email)
+	err := queries[ssGetEmployee].QueryRow(eid).Scan(&emp.FirstName, &emp.LastName, &emp.Email, &emp.UserName)
 	if !IsNilErr(err) {
 		return &emp, newErrFromErr(err, execNames[ssGetEmployee])
 	}
@@ -284,7 +296,7 @@ func GetEmployees() ([]*Employee, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var e Employee
-		if err := rows.Scan(&e.ID, &e.FirstName, &e.LastName, &e.Email); err != nil {
+		if err := rows.Scan(&e.ID, &e.FirstName, &e.LastName, &e.Email, &e.UserName); err != nil {
 			return emps, newErrFromErr(err, execNames[ssGetEmps], "rows.Scan")
 		}
 		emps = append(emps, &e)
@@ -436,8 +448,8 @@ func GetVulnIDtx(tx *sql.Tx, vulnname string) (int64, error) {
 }
 
 // InsertAffected will insert a new row into the affected table with key (vid, sid).
-func InsertAffected(tx *sql.Tx, vid, sid int64) Err {
-	return execMutation(tx, ssInsertAffected, vid, sid)
+func InsertAffected(tx *sql.Tx, vid, sid int64, mitigated bool) Err {
+	return execMutation(tx, ssInsertAffected, vid, sid, mitigated)
 }
 
 // InsertDates inserts the dates published, initiated, and mitigated.
@@ -446,8 +458,8 @@ func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) err
 }
 
 // InsertEmployee inserts the employee's first name, last name, and email.
-func InsertEmployee(tx *sql.Tx, first, last, email string) error {
-	return execMutation(tx, ssInsertEmployee, first, last, email)
+func InsertEmployee(tx *sql.Tx, first, last, email, username string) error {
+	return execMutation(tx, ssInsertEmployee, first, last, email, username)
 }
 
 // InsertImpact inserts the CVSS score, Corpscore, and CVSSlink.
@@ -560,9 +572,9 @@ func SetTickets(tx *sql.Tx, vuln *Vulnerability) error {
 	return errs
 }
 
-// UpdateAffected will update the system ID associated with the (vid, oldSid) row to newSid.
-func UpdateAffected(tx *sql.Tx, vid int64, oldSid, newSid int) Err {
-	return execMutation(tx, ssUpdateAffected, newSid, vid, oldSid)
+// UpdateAffected will update the mitigated status for (vid, sid).
+func UpdateAffected(tx *sql.Tx, vid, sid int64, mit bool) Err {
+	return execMutation(tx, ssUpdateAffected, mit, vid, sid)
 }
 
 // UpdateCve will update the CVE for the given vulnerability ID.
@@ -598,6 +610,11 @@ func UpdateEmpFname(tx *sql.Tx, eid int64, name string) Err {
 // UpdateEmpLname will update the last name of the employee with the given ID.
 func UpdateEmpLname(tx *sql.Tx, eid int64, name string) Err {
 	return execMutation(tx, ssUpdateEmpLname, name, eid)
+}
+
+// UpdateEmpUname will update the username of the employee with the given ID.
+func UpdateEmpUname(tx *sql.Tx, eid int64, uname string) Err {
+	return execMutation(tx, ssUpdateEmpUname, uname, eid)
 }
 
 // UpdateExploit will update the exploit and the exploitable column for the given vulnerability ID.
