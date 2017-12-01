@@ -193,7 +193,7 @@ ALTER TABLE tickets OWNER TO vars;
 CREATE TABLE vuln (
     vulnid integer NOT NULL,
     vulnname text NOT NULL,
-    cve character varying(25),
+    cve text,
     finder integer NOT NULL,
     initiator integer NOT NULL,
     summary text NOT NULL,
