@@ -51,13 +51,7 @@ func main() {
 
 // *** used for testing -- REMOVE ***
 func DisplaySession(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var emp vars.Employee
-	session := sessionManager.Load(r)
-	authed, err := session.GetBool("authed")
-	if err != nil {
-		w.WriteHeader(500)
-	}
-	err = session.GetObject("employee", &emp)
+	authed, emp, err := getSession(r)
 	if err != nil {
 		w.WriteHeader(500)
 	}
@@ -111,4 +105,19 @@ func LoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		}
 		w.Write([]byte("Invalid credentials"))
 	}
+}
+
+// getSession unpacks the objects from the session cookie associated with the request and returns them.
+func getSession(r *http.Request) (bool, *vars.Employee, error) {
+	var emp vars.Employee
+	session := sessionManager.Load(r)
+	authed, err := session.GetBool("authed")
+	if err != nil {
+		return false, &emp, err
+	}
+	err = session.GetObject("employee", &emp)
+	if err != nil {
+		return authed, &emp, err
+	}
+	return authed, &emp, nil
 }
