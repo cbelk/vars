@@ -2,8 +2,11 @@ package varsapi
 
 import (
 	"database/sql"
+	"errors"
+	"time"
 
 	"github.com/cbelk/vars"
+	"github.com/lib/pq"
 )
 
 // AddAffected adds a new vulnerability/system pair to the affected table
@@ -190,7 +193,7 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}
 
 	// Insert the values in the dates table
-	err = vars.InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
+	err = vars.InsertDates(tx, vuln.ID, time.Now(), vuln.Dates.Published, vuln.Dates.Mitigated)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -228,7 +231,7 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 }
 
 // CloseVulnerability sets the 'mitigated' date equal to the date parameter for the given vulnid.
-func CloseVulnerability(db *sql.DB, vid int64, date vars.VarsNullString) error {
+func CloseVulnerability(db *sql.DB, vid int64) error {
 	//Start transaction and set rollback function
 	tx, err := db.Begin()
 	if err != nil {
@@ -241,6 +244,7 @@ func CloseVulnerability(db *sql.DB, vid int64, date vars.VarsNullString) error {
 		}
 	}()
 
+	date := GetVarsNullTime(time.Now())
 	err = vars.UpdateMitDate(tx, vid, date)
 	if !vars.IsNilErr(err) {
 		return err
@@ -451,6 +455,11 @@ func GetVarsNullBool(b bool) vars.VarsNullBool {
 // GetVarsNullString creates/returns a VarsNullString object using the given string paramter.
 func GetVarsNullString(str string) vars.VarsNullString {
 	return vars.VarsNullString{sql.NullString{String: str, Valid: true}}
+}
+
+// GetVarsNullTime creates/returns a VarsNullTime object using the given time paramter.
+func GetVarsNullTime(t time.Time) vars.VarsNullTime {
+	return vars.VarsNullTime{pq.NullTime{Time: t, Valid: true}}
 }
 
 // GetVulnerabilities retrieves/returns all vulnerabilities.
@@ -850,19 +859,68 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 			return err
 		}
 	}
-	if old.Dates.Published != vuln.Dates.Published {
+	// Check (and update if needed) the published time
+	opt, err := old.Dates.Published.Value()
+	if err != nil {
+		return err
+	}
+	npt, err := vuln.Dates.Published.Value()
+	if err != nil {
+		return err
+	}
+	if opt != nil && npt != nil {
+		opd, ok := opt.(time.Time)
+		if !ok {
+			return errors.New("Varsapi: UpdateVulnerability: Failed to assert type for old published date.")
+		}
+		npd, ok := npt.(time.Time)
+		if !ok {
+			return errors.New("Varsapi: UpdateVulnerability: Failed to assert type for new published date")
+		}
+		if !opd.Equal(npd) {
+			err = vars.UpdatePubDate(tx, vuln.ID, vuln.Dates.Published)
+			if !vars.IsNilErr(err) {
+				return err
+			}
+		}
+	} else if opt == nil && npt != nil {
 		err = vars.UpdatePubDate(tx, vuln.ID, vuln.Dates.Published)
 		if !vars.IsNilErr(err) {
 			return err
 		}
 	}
-	if old.Dates.Initiated != vuln.Dates.Initiated {
+	// Check (and update if needed) the initiated time
+	if !old.Dates.Initiated.Equal(vuln.Dates.Initiated) {
 		err = vars.UpdateInitDate(tx, vuln.ID, vuln.Dates.Initiated)
 		if !vars.IsNilErr(err) {
 			return err
 		}
 	}
-	if old.Dates.Mitigated != vuln.Dates.Mitigated {
+	// Check (and update if needed) the mitigated time
+	omt, err := old.Dates.Mitigated.Value()
+	if err != nil {
+		return err
+	}
+	nmt, err := vuln.Dates.Mitigated.Value()
+	if err != nil {
+		return err
+	}
+	if omt != nil && nmt != nil {
+		omd, ok := omt.(time.Time)
+		if !ok {
+			return errors.New("Varsapi: UpdateVulnerability: Failed to assert type for old mitigated date")
+		}
+		nmd, ok := nmt.(time.Time)
+		if !ok {
+			return errors.New("Varsapi: UpdateVulnerability: Failed to assert type for new mitigated date")
+		}
+		if !omd.Equal(nmd) {
+			err = vars.UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated)
+			if !vars.IsNilErr(err) {
+				return err
+			}
+		}
+	} else if omt == nil && nmt != nil {
 		err = vars.UpdateMitDate(tx, vuln.ID, vuln.Dates.Mitigated)
 		if !vars.IsNilErr(err) {
 			return err

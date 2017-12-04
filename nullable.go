@@ -3,6 +3,9 @@ package vars
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
+
+	"github.com/lib/pq"
 )
 
 // VarsNullString holds a sql.NullString. Needed for marshaling/unmarshaling.
@@ -29,6 +32,40 @@ func (v *VarsNullString) UnmarshalJSON(data []byte) error {
 	if x != nil {
 		v.Valid = true
 		v.String = *x
+	} else {
+		v.Valid = false
+	}
+	return nil
+}
+
+// VarsNullTime holds a pq.NullTime. Needed for marshaling/unmarshaling.
+type VarsNullTime struct {
+	pq.NullTime
+}
+
+// MarshalJSON will marshal the time if it is valid.
+func (v VarsNullTime) MarshallJSON() ([]byte, error) {
+	if v.Valid {
+		t, err := v.Value()
+		if err != nil {
+			return make([]byte, 0), err
+		}
+		return json.Marshal(t)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+// UnmarshalJSON will unmarshal the time if it is valid and set valid to true, otherwise valid is set to false.
+func (v VarsNullTime) UnmarshalJSON(data []byte) error {
+	// Unmarshalling into a pointer will let us detect null
+	var x *time.Time
+	if err := json.Unmarshal(data, &x); err != nil {
+		return err
+	}
+	if x != nil {
+		v.Valid = true
+		v.Time = *x
 	} else {
 		v.Valid = false
 	}

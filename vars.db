@@ -64,9 +64,9 @@ ALTER TABLE cves OWNER TO vars;
 
 CREATE TABLE dates (
     vulnid integer NOT NULL,
-    published date,
-    initiated date NOT NULL,
-    mitigated date
+    published timestamp without time zone,
+    initiated timestamp without time zone NOT NULL,
+    mitigated timestamp without time zone
 );
 
 

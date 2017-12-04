@@ -9,6 +9,7 @@ import (
 
 	"github.com/cbelk/vars"
 	"github.com/cbelk/vars/pkg/varsapi"
+	"github.com/lib/pq"
 )
 
 var (
@@ -26,8 +27,8 @@ var (
 		{FirstName: "Christian", LastName: "Belk", Email: "christian.belk@test.it", UserName: "christianb", Level: 0},
 	}
 	vulns = []vars.Vulnerability{
-		{Name: "DirtyCOW", Cves: []string{"CVE-2016-5195"}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
-		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/2/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
+		{Name: "DirtyCOW", Cves: []string{"CVE-2016-5195"}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullTime{pq.NullTime{Time: time.Date(2016, time.November, 10, 1, 2, 3, 4, time.UTC), Valid: true}}}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
+		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
 	}
 )
 
@@ -224,8 +225,7 @@ func testCloseVulnerability(db *sql.DB, vid int64) {
 		log.Fatal(err)
 	}
 	fmt.Printf("Closing vulnerability: %v ...\n", vuln.Name)
-	now := varsapi.GetVarsNullString(time.Now().Format(FORMAT))
-	err = varsapi.CloseVulnerability(db, vid, now)
+	err = varsapi.CloseVulnerability(db, vid)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
@@ -427,7 +427,7 @@ func testUpdateVulnerability(db *sql.DB) {
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
-	vuln.Dates.Published = vars.ToVarsNullString("1/1/1970")
+	vuln.Dates.Published = varsapi.GetVarsNullTime(time.Date(1970, time.January, 1, 5, 4, 3, 2, time.UTC))
 	vuln.Tickets = append(vuln.Tickets, "ticket411")
 	vuln.Tickets[0] = "ticket917"
 	vuln.References = []string{"some new reference"}

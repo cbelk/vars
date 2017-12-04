@@ -245,9 +245,9 @@ type System struct {
 
 // VulnDates holds the different dates relating to the vulnerability.
 type VulnDates struct {
-	Published VarsNullString // Date the vulnerability was made public
-	Initiated string         // Date the vulnerability assessment was started
-	Mitigated VarsNullString // Date the vulnerability was mitigated on all systems
+	Published VarsNullTime // Date the vulnerability was made public
+	Initiated time.Time    // Date the vulnerability assessment was started
+	Mitigated VarsNullTime // Date the vulnerability was mitigated on all systems
 }
 
 // Vulnerability holds information about a discovered vulnerability and the vulnerability assessment.
@@ -534,7 +534,7 @@ func InsertCve(tx *sql.Tx, vid int64, cve string) Err {
 }
 
 // InsertDates inserts the dates published, initiated, and mitigated.
-func InsertDates(tx *sql.Tx, vid int64, ini string, pub, mit VarsNullString) error {
+func InsertDates(tx *sql.Tx, vid int64, ini time.Time, pub, mit VarsNullTime) error {
 	return execMutation(tx, ssInsertDates, vid, pub, ini, mit)
 }
 
@@ -744,13 +744,13 @@ func UpdateInitiator(tx *sql.Tx, vid int64, initiator int) Err {
 }
 
 // UpdateInitDate will update the date that the vulnerability assessment was initiated for the given vulnerability ID.
-func UpdateInitDate(tx *sql.Tx, vid int64, initDate string) Err {
+func UpdateInitDate(tx *sql.Tx, vid int64, initDate time.Time) Err {
 	return execMutation(tx, ssUpdateInitDate, initDate, vid)
 }
 
 // UpdateMitDate will update the date that the vulnerability assessment was mitigated for the given vulnerability ID.
 // To set the mitigation date to NULL, pass in an empty string for mitDate.
-func UpdateMitDate(tx *sql.Tx, vid int64, mitDate VarsNullString) Err {
+func UpdateMitDate(tx *sql.Tx, vid int64, mitDate VarsNullTime) Err {
 	return execMutation(tx, ssUpdateMitDate, mitDate, vid)
 }
 
@@ -766,7 +766,7 @@ func UpdateNote(tx *sql.Tx, nid int64, note string) Err {
 
 // UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.
 // To set the published date to NULL, pass in an empty string for pubDate.
-func UpdatePubDate(tx *sql.Tx, vid int64, pubDate VarsNullString) Err {
+func UpdatePubDate(tx *sql.Tx, vid int64, pubDate VarsNullTime) Err {
 	return execMutation(tx, ssUpdatePubDate, pubDate, vid)
 }
 
