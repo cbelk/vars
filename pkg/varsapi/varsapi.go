@@ -143,7 +143,7 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}
 
 	// Insert the vulnerability into the database
-	err = vars.InsertVulnerability(tx, vuln.Name, vuln.Cve, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation)
+	err = vars.InsertVulnerability(tx, vuln.Name, vuln.Finder, vuln.Initiator, vuln.Summary, vuln.Test, vuln.Mitigation)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -163,6 +163,12 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 
 	// Insert the values in the dates table
 	err = vars.InsertDates(tx, vuln.ID, vuln.Dates.Initiated, vuln.Dates.Published, vuln.Dates.Mitigated)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Insert the values in the cves table
+	err = vars.SetCves(tx, vuln)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -402,6 +408,13 @@ func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 		}
 		vuln.Dates = *vd
 
+		// Get cves
+		cves, err := vars.GetCves(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.Cves = *cves
+
 		// Get tickets
 		ticks, err := vars.GetTickets(vuln.ID)
 		if !vars.IsNilErr(err) {
@@ -443,6 +456,13 @@ func GetVulnerability(vid int64) (*vars.Vulnerability, error) {
 		return &v, err
 	}
 	vuln.Dates = *vd
+
+	// Get Cves
+	cves, err := vars.GetCves(vid)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.Cves = *cves
 
 	// Get tickets
 	ticks, err := vars.GetTickets(vid)
@@ -694,12 +714,6 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 			return err
 		}
 	}
-	if old.Cve != vuln.Cve {
-		err = vars.UpdateCve(tx, vuln.ID, vuln.Cve)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
 	if old.Cvss != vuln.Cvss {
 		err = vars.UpdateCvss(tx, vuln.ID, vuln.Cvss)
 		if !vars.IsNilErr(err) {
@@ -780,6 +794,10 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 			return err
 		}
 	}
+	err = UpdateCves(tx, old, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
 	err = UpdateTickets(tx, old, vuln)
 	if !vars.IsNilErr(err) {
 		return err
@@ -792,6 +810,25 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	rollback = false
 	if e := tx.Commit(); e != nil {
 		return e
+	}
+	return nil
+}
+
+// UpdateCves determines the rows that need to be deleted/added and calls the appropriate VARS function.
+func UpdateCves(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
+	del := toBeDeleted(&old.Cves, &vuln.Cves)
+	for _, cve := range *del {
+		err := vars.DeleteCve(tx, vuln.ID, cve)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	add := toBeAdded(&old.Cves, &vuln.Cves)
+	for _, cve := range *add {
+		err := vars.InsertCve(tx, vuln.ID, cve)
+		if !vars.IsNilErr(err) {
+			return err
+		}
 	}
 	return nil
 }

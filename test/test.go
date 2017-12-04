@@ -19,13 +19,14 @@ var (
 		{Name: "mtx103", Type: "server", OpSys: "windows 2012", Location: "hosted", Description: "Some other server again"},
 	}
 	emps = []vars.Employee{
-		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it", UserName: "bbarker"},
-		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it", UserName: "aturing"},
-		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it", UserName: "afranklin"},
-		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it", UserName: "pmonch"},
+		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it", UserName: "bbarker", Level: 3},
+		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it", UserName: "aturing", Level: 2},
+		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it", UserName: "afranklin", Level: 1},
+		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it", UserName: "pmonch", Level: 2},
+		{FirstName: "Christian", LastName: "Belk", Email: "christian.belk@test.it", UserName: "christianb", Level: 0},
 	}
 	vulns = []vars.Vulnerability{
-		{Name: "DirtyCOW", Cve: vars.VarsNullString{sql.NullString{String: "CVE-2016-5195", Valid: true}}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
+		{Name: "DirtyCOW", Cves: []string{"CVE-2016-5195"}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullString{sql.NullString{String: "11/10/2016", Valid: true}}, Initiated: "11/11/2016"}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
 		{Name: "Cortana", Cvss: 9.5, CorpScore: 9.0, Finder: 4, Initiator: 4, Summary: "This junk be spying on ya", Test: "Is Windows installed? Yes? Then you have it :(", Mitigation: "Uninstall windows", Dates: vars.VulnDates{Initiated: "1/2/1970"}, Tickets: []string{"ticket911"}, References: []string{"https://img.memesuper.com/164df9ae93ae7920d943f86163fa57d1_microsoft-freak-attack-time-meleney-meme_500-375.jpeg"}},
 	}
 )
@@ -200,7 +201,7 @@ func testGetActiveSystems() {
 
 func testGetEmployee(eid int64) {
 	fmt.Printf("Retrieving employee with ID %v ...\n", eid)
-	emp, err := varsapi.GetEmployee(eid)
+	emp, err := varsapi.GetEmployeeByID(eid)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)
 	}
@@ -339,6 +340,7 @@ func testUpdateVulnerability(db *sql.DB) {
 	vuln.Tickets = append(vuln.Tickets, "ticket411")
 	vuln.Tickets[0] = "ticket917"
 	vuln.References = []string{"some new reference"}
+	vuln.Cves = append(vuln.Cves, "CVE-2088-1234")
 	err = varsapi.UpdateVulnerability(db, vuln)
 	if !vars.IsNilErr(err) {
 		log.Fatal(err)

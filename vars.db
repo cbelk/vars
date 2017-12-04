@@ -47,6 +47,18 @@ CREATE TABLE affected (
 ALTER TABLE affected OWNER TO vars;
 
 --
+-- Name: cves; Type: TABLE; Schema: public; Owner: vars
+--
+
+CREATE TABLE cves (
+    vulnid integer NOT NULL,
+    cve text NOT NULL
+);
+
+
+ALTER TABLE cves OWNER TO vars;
+
+--
 -- Name: dates; Type: TABLE; Schema: public; Owner: vars
 --
 
@@ -193,7 +205,6 @@ ALTER TABLE tickets OWNER TO vars;
 CREATE TABLE vuln (
     vulnid integer NOT NULL,
     vulnname text NOT NULL,
-    cve text,
     finder integer NOT NULL,
     initiator integer NOT NULL,
     summary text NOT NULL,
@@ -252,6 +263,14 @@ ALTER TABLE ONLY vuln ALTER COLUMN vulnid SET DEFAULT nextval('vuln_vulnid_seq':
 
 ALTER TABLE ONLY affected
     ADD CONSTRAINT affected_pkey PRIMARY KEY (vulnid, sysid);
+
+
+--
+-- Name: cves_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY cves
+    ADD CONSTRAINT cves_pkey PRIMARY KEY (vulnid, cve);
 
 
 --
@@ -332,6 +351,14 @@ ALTER TABLE ONLY affected
 
 ALTER TABLE ONLY affected
     ADD CONSTRAINT affected_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
+
+
+--
+-- Name: cves_vulnid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY cves
+    ADD CONSTRAINT cves_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
 
 
 --
