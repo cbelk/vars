@@ -99,6 +99,18 @@ func main() {
 	// Test updating affected systems
 	testUpdateAffected(db, &vulns[0], &systems[0])
 
+	// Test adding notes
+	testAddNotes(db)
+
+	// Test getting notes
+	testGetNotes()
+
+	// Test updating note
+	testUpdateNote(db)
+
+	// Test getting notes again
+	testGetNotes()
+
 	// Test closing a VA
 	testCloseVulnerability(db, vulns[0].ID)
 
@@ -135,6 +147,52 @@ func testAddEmps(db *sql.DB) {
 		if !vars.IsNilErr(err) {
 			log.Fatal(err)
 		}
+	}
+}
+
+func testAddNotes(db *sql.DB) {
+	// Add note to DirtyCOW
+	fmt.Printf("Adding note to %v ...\n", vulns[0].Name)
+	vid, err := vars.GetVulnID(vulns[0].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	emp, err := varsapi.GetEmployeeByUsername(emps[3].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note := "They just discovered a vulnerability in the patch!!"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add note to Cortana
+	fmt.Printf("Adding note to %v ...\n", vulns[1].Name)
+	vid, err = vars.GetVulnID(vulns[1].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	emp, err = varsapi.GetEmployeeByUsername(emps[0].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note = "Maybe we should just get rid of Windows?"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add another note to Cortana
+	fmt.Printf("Adding note to %v ...\n", vulns[1].Name)
+	emp, err = varsapi.GetEmployeeByUsername(emps[2].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note = "I agree ^"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -231,6 +289,21 @@ func testGetClosedVAs() {
 	}
 }
 
+func testGetNotes() {
+	fmt.Printf("Retrieving notes for %v:\n", vulns[1].Name)
+	vid, err := vars.GetVulnID(vulns[1].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	notes, err := varsapi.GetNotes(vid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, n := range notes {
+		fmt.Println(n)
+	}
+}
+
 func testGetOpenVAs() {
 	fmt.Println("Retrieving open VAs ...")
 	vulns, err := varsapi.GetOpenVulnerabilities()
@@ -311,6 +384,24 @@ func testUpdateEmployee(db *sql.DB, item int64) {
 	nEmp.Email = fmt.Sprintf("%v.%v@newemail.com", nEmp.FirstName, nEmp.LastName)
 	err = varsapi.UpdateEmployee(db, &nEmp)
 	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+}
+
+func testUpdateNote(db *sql.DB) {
+	fmt.Printf("Updating last note for %v:\n", vulns[1].Name)
+	vid, err := vars.GetVulnID(vulns[1].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	notes, err := varsapi.GetNotes(vid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	nid := notes[len(notes)-1].ID
+	note := fmt.Sprintf("I agree with %v %v", emps[0].FirstName, emps[0].LastName)
+	err = varsapi.UpdateNote(db, nid, note)
+	if err != nil {
 		log.Fatal(err)
 	}
 }

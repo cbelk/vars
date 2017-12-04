@@ -137,6 +137,42 @@ CREATE TABLE impact (
 ALTER TABLE impact OWNER TO vars;
 
 --
+-- Name: notes; Type: TABLE; Schema: public; Owner: vars
+--
+
+CREATE TABLE notes (
+    noteid integer NOT NULL,
+    vulnid integer NOT NULL,
+    empid integer NOT NULL,
+    added timestamp without time zone NOT NULL,
+    note text NOT NULL
+);
+
+
+ALTER TABLE notes OWNER TO vars;
+
+--
+-- Name: notes_noteid_seq; Type: SEQUENCE; Schema: public; Owner: vars
+--
+
+CREATE SEQUENCE notes_noteid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE notes_noteid_seq OWNER TO vars;
+
+--
+-- Name: notes_noteid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: vars
+--
+
+ALTER SEQUENCE notes_noteid_seq OWNED BY notes.noteid;
+
+
+--
 -- Name: ref; Type: TABLE; Schema: public; Owner: vars
 --
 
@@ -244,6 +280,13 @@ ALTER TABLE ONLY emp ALTER COLUMN empid SET DEFAULT nextval('emp_empid_seq'::reg
 
 
 --
+-- Name: noteid; Type: DEFAULT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY notes ALTER COLUMN noteid SET DEFAULT nextval('notes_noteid_seq'::regclass);
+
+
+--
 -- Name: sysid; Type: DEFAULT; Schema: public; Owner: vars
 --
 
@@ -303,6 +346,14 @@ ALTER TABLE ONLY exploits
 
 ALTER TABLE ONLY impact
     ADD CONSTRAINT impact_pkey PRIMARY KEY (vulnid);
+
+
+--
+-- Name: notes_pkey; Type: CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY notes
+    ADD CONSTRAINT notes_pkey PRIMARY KEY (noteid);
 
 
 --
@@ -383,6 +434,22 @@ ALTER TABLE ONLY exploits
 
 ALTER TABLE ONLY impact
     ADD CONSTRAINT impact_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
+
+
+--
+-- Name: notes_empid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY notes
+    ADD CONSTRAINT notes_empid_fkey FOREIGN KEY (empid) REFERENCES emp(empid);
+
+
+--
+-- Name: notes_vulnid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vars
+--
+
+ALTER TABLE ONLY notes
+    ADD CONSTRAINT notes_vulnid_fkey FOREIGN KEY (vulnid) REFERENCES vuln(vulnid);
 
 
 --

@@ -69,6 +69,34 @@ func AddEmployee(db *sql.DB, emp *vars.Employee) error {
 	return nil
 }
 
+// AddNote inserts a new note into the database.
+func AddNote(db *sql.DB, vid, eid int64, note string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Add note
+	err = vars.InsertNote(tx, vid, eid, note)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // AddSystem adds a new system to the database.
 func AddSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
@@ -293,6 +321,34 @@ func DeleteAffected(db *sql.DB, vid, sid int64) error {
 	return nil
 }
 
+// DeleteNote deletes the note with the given noteid.
+func DeleteNote(db *sql.DB, nid int64) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete the note (nid)
+	err = vars.DeleteNote(tx, nid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // GetEmployeeByID returns an Employee object with the given empid.
 func GetEmployeeByID(eid int64) (*vars.Employee, error) {
 	return vars.GetEmployee(eid)
@@ -338,6 +394,11 @@ func GetClosedVulnerabilities() ([]*vars.Vulnerability, error) {
 // GetConfig retrieves/returns the Config object that was created in VARS.
 func GetConfig() vars.Config {
 	return vars.Conf
+}
+
+// GetNotes retrieves/returns a slice of pointers to all note objects for the given vulnid.
+func GetNotes(vid int64) ([]*vars.Note, error) {
+	return vars.GetNotes(vid)
 }
 
 // GetOpenVulnerabilities builds/returns a slice of pointers to Vulnerabilities that
@@ -581,6 +642,33 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 		if !vars.IsNilErr(err) {
 			return err
 		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateNote will update the note with the given noteid.
+func UpdateNote(db *sql.DB, noteid int64, note string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateNote(tx, noteid, note)
+	if !vars.IsNilErr(err) {
+		return err
 	}
 
 	// Commit the transaction

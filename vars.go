@@ -3,6 +3,7 @@ package vars
 
 import (
 	"database/sql"
+	"time"
 
 	_ "github.com/lib/pq" // Postgresql driver
 )
@@ -15,14 +16,16 @@ const (
 	ssCheckSysName
 	ssDeleteAffected
 	ssDeleteCve
+	ssDeleteNote
 	ssDeleteRef
 	ssDeleteTicket
+	ssGetClosedVulnIDs
 	ssGetCves
 	ssGetEmployee
 	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
-	ssGetClosedVulnIDs
+	ssGetNotes
 	ssGetOpenVulnIDs
 	ssGetReferences
 	ssGetSystem
@@ -38,6 +41,7 @@ const (
 	ssInsertDates
 	ssInsertEmployee
 	ssInsertExploit
+	ssInsertNote
 	ssInsertImpact
 	ssInsertRefers
 	ssInsertSystem
@@ -59,6 +63,7 @@ const (
 	ssUpdateInitDate
 	ssUpdateMitDate
 	ssUpdateMitigation
+	ssUpdateNote
 	ssUpdatePubDate
 	ssUpdateRefers
 	ssUpdateSummary
@@ -82,6 +87,7 @@ var (
 		ssCheckSysName:     "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteAffected:   "DELETE FROM affected WHERE vulnid=$1 AND sysid=$2;",
 		ssDeleteCve:        "DELETE FROM cves WHERE vulnid=$1 AND cve=$2;",
+		ssDeleteNote:       "DELETE FROM notes WHERE noteid=$1;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
 		ssGetClosedVulnIDs: "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
@@ -90,6 +96,7 @@ var (
 		ssGetEmpID:         "SELECT empid FROM emp WHERE username=$1;",
 		ssGetEmps:          "SELECT empid, firstname, lastname, email, username, level FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
+		ssGetNotes:         "SELECT noteid, empid, added, note FROM notes WHERE vulnid=$1 ORDER BY added ASC;",
 		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:        "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
@@ -105,6 +112,7 @@ var (
 		ssInsertDates:      "INSERT INTO dates (vulnid, published, initiated, mitigated) VALUES ($1, $2, $3, $4);",
 		ssInsertEmployee:   "INSERT INTO emp (firstname, lastname, email, username, level) VALUES ($1, $2, $3, $4, $5);",
 		ssInsertExploit:    "INSERT INTO exploits (vulnid, exploitable, exploit) VALUES ($1, $2, $3);",
+		ssInsertNote:       "INSERT INTO notes (vulnid, empid, added, note) VALUES ($1, $2, $3, $4);",
 		ssInsertImpact:     "INSERT INTO impact (vulnid, cvss, cvsslink, corpscore) VALUES ($1, $2, $3, $4);",
 		ssInsertRefers:     "INSERT INTO ref (vulnid, url) VALUES ($1, $2);",
 		ssInsertSystem:     "INSERT INTO systems (sysname, systype, opsys, location, description, state) VALUES ($1, $2, $3, $4, $5, $6);",
@@ -126,6 +134,7 @@ var (
 		ssUpdateInitDate:   "UPDATE dates SET initiated=$1 WHERE vulnid=$2;",
 		ssUpdateMitDate:    "UPDATE dates SET mitigated=$1 WHERE vulnid=$2;",
 		ssUpdateMitigation: "UPDATE vuln SET mitigation=$1 WHERE vulnid=$2;",
+		ssUpdateNote:       "UPDATE notes SET note=$1, added=$2 WHERE noteid=$3;",
 		ssUpdatePubDate:    "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 		ssUpdateRefers:     "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
 		ssUpdateSummary:    "UPDATE vuln SET summary=$1 WHERE vulnid=$2;",
@@ -143,6 +152,7 @@ var (
 		ssActiveSystems:    "GetActiveSystems",
 		ssDeleteAffected:   "DeleteAffected",
 		ssDeleteCve:        "DeleteCve",
+		ssDeleteNote:       "DeleteNote",
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
 		ssGetCves:          "GetCves",
@@ -151,6 +161,7 @@ var (
 		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
 		ssGetClosedVulnIDs: "GetClosedVulnIDs",
+		ssGetNotes:         "GetNotes",
 		ssGetOpenVulnIDs:   "GetOpenVulnIDs",
 		ssGetReferences:    "GetReferences",
 		ssGetSystem:        "GetSystem",
@@ -166,6 +177,7 @@ var (
 		ssInsertEmployee:   "InsertEmployee",
 		ssInsertExploit:    "InsertExploit",
 		ssInsertImpact:     "InsertImpact",
+		ssInsertNote:       "InsertNote",
 		ssInsertRefers:     "InsertRef",
 		ssInsertTicket:     "InsertTicket",
 		ssInsertVuln:       "InsertVulnerability",
@@ -185,6 +197,7 @@ var (
 		ssUpdateInitDate:   "UpdateInitDate",
 		ssUpdateMitDate:    "UpdateMitDate",
 		ssUpdateMitigation: "UpdateMitigation",
+		ssUpdateNote:       "UpdateNote",
 		ssUpdatePubDate:    "UpdatePubDate",
 		ssUpdateRefers:     "UpdateRefers",
 		ssUpdateSummary:    "UpdateSummary",
@@ -208,6 +221,15 @@ type Employee struct {
 	Email     string
 	UserName  string
 	Level     int
+}
+
+// Note holds the imformation about a note
+type Note struct {
+	ID     int64
+	VulnID int64
+	EmpID  int64
+	Added  time.Time
+	Note   string
 }
 
 // System holds information about systems in the environment.
@@ -256,6 +278,11 @@ func DeleteAffected(tx *sql.Tx, vid, sid int64) Err {
 // DeleteCve deletes the row in the cves table with the given vulnid and cve.
 func DeleteCve(tx *sql.Tx, vid int64, cve string) Err {
 	return execMutation(tx, ssDeleteCve, vid, cve)
+}
+
+// DeleteNote deletes the row in the notes table with the given noteid.
+func DeleteNote(tx *sql.Tx, noteid int64) Err {
+	return execMutation(tx, ssDeleteNote, noteid)
 }
 
 // DeleteRef deletes the row in the ref table with the given vulnid and url.
@@ -354,6 +381,27 @@ func GetCves(vid int64) (*[]string, error) {
 // GetOpenVulnIDs returns a pointer to a slice of vulnerability IDs that do not have a mitigated date.
 func GetOpenVulnIDs() (*[]int64, error) {
 	return execGetRowsInt(ssGetOpenVulnIDs)
+}
+
+// GetNotes returns a slice of pointers to note objects.
+func GetNotes(vid int64) ([]*Note, error) {
+	notes := []*Note{}
+	rows, err := queries[ssGetNotes].Query(vid)
+	if err != nil {
+		return notes, newErrFromErr(err, execNames[ssGetNotes])
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n Note
+		if err := rows.Scan(&n.ID, &n.EmpID, &n.Added, &n.Note); err != nil {
+			return notes, newErrFromErr(err, execNames[ssGetNotes], "rows.Scan")
+		}
+		notes = append(notes, &n)
+	}
+	if err := rows.Err(); err != nil {
+		return notes, newErrFromErr(err, execNames[ssGetNotes])
+	}
+	return notes, nil
 }
 
 // GetReferences returns a pointer to a slice of urls associated with the vulnid.
@@ -498,6 +546,11 @@ func InsertEmployee(tx *sql.Tx, first, last, email, username string, level int) 
 // InsertImpact inserts the CVSS score, Corpscore, and CVSSlink.
 func InsertImpact(tx *sql.Tx, vid int64, cvss, corpscore float32, cvsslink VarsNullString) error {
 	return execMutation(tx, ssInsertImpact, vid, cvss, cvsslink, corpscore)
+}
+
+// InsertNote inserts the vulnid, empid, date added, and note.
+func InsertNote(tx *sql.Tx, vid, eid int64, note string) Err {
+	return execMutation(tx, ssInsertNote, vid, eid, time.Now(), note)
 }
 
 // InsertRef will insert a new row into the ref table with key (vid, url).
@@ -704,6 +757,11 @@ func UpdateMitDate(tx *sql.Tx, vid int64, mitDate VarsNullString) Err {
 // UpdateMitigation will update the mitigation associated with the vulnerability ID.
 func UpdateMitigation(tx *sql.Tx, vid int64, mit string) Err {
 	return execMutation(tx, ssUpdateMitigation, mit, vid)
+}
+
+// UpdateNote will update the note and added date for the given noteid.
+func UpdateNote(tx *sql.Tx, nid int64, note string) Err {
+	return execMutation(tx, ssUpdateNote, note, time.Now(), nid)
 }
 
 // UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.
