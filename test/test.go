@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -118,6 +119,9 @@ func main() {
 	// Test getting open/closed VAs
 	testGetOpenVAs()
 	testGetClosedVAs()
+
+	// Test marshaling/unmarshaling the VARS nullable types
+	testNullableJSON()
 
 	fmt.Println("\n\nDone!")
 }
@@ -354,6 +358,29 @@ func testGetVulnerability(vname string) {
 		log.Fatal(err)
 	}
 	fmt.Printf("%v\n", vuln)
+}
+
+func testNullableJSON() {
+	fmt.Println("Testing [un]marshaling vulnerabilities ...")
+	vulns, err := varsapi.GetVulnerabilities()
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	for _, v := range vulns {
+		fmt.Printf("\nMarshaling vulnerability %v ...\n", v.Name)
+		mv, err := json.Marshal(v)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("\nMarshaled data is:\n%v\n", string(mv))
+		fmt.Printf("\nUnmarshaling vulnerability %v ...\n", v.Name)
+		var n vars.Vulnerability
+		err = json.Unmarshal(mv, &n)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("\nUnmarshaled vulnerability is:\n%v\nOriginal is\n%v\n", n, *v)
+	}
 }
 
 func testUpdateAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) {
