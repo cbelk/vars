@@ -44,7 +44,7 @@ type VarsNullTime struct {
 }
 
 // MarshalJSON will marshal the time if it is valid.
-func (v VarsNullTime) MarshallJSON() ([]byte, error) {
+func (v VarsNullTime) MarshalJSON() ([]byte, error) {
 	if v.Valid {
 		t, err := v.Value()
 		if err != nil {
@@ -57,17 +57,17 @@ func (v VarsNullTime) MarshallJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON will unmarshal the time if it is valid and set valid to true, otherwise valid is set to false.
-func (v VarsNullTime) UnmarshalJSON(data []byte) error {
-	// Unmarshalling into a pointer will let us detect null
-	var x *time.Time
+func (v *VarsNullTime) UnmarshalJSON(data []byte) error {
+	var x time.Time
 	if err := json.Unmarshal(data, &x); err != nil {
 		return err
 	}
-	if x != nil {
+	if !x.IsZero() {
 		v.Valid = true
-		v.Time = *x
+		v.Time = x
 	} else {
 		v.Valid = false
+		v.Time = x
 	}
 	return nil
 }
