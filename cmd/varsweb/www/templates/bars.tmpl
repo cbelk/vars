@@ -1,13 +1,16 @@
 {% raw %}
 
 // navbar template
-{{define "navbar"}}
+{{define "navbar-begin"}}
 <nav class="navbar navbar-default navbar-fixed-top bg-dark">
     <div class="container-fluid">
         <div class="navbar-header">
             <a class="navbar-brand" href="#">
                 <img alt="Vulnerability Assessment Reference System" src="/images/logo.png">
             </a>
+{{end}}
+
+{{define "navbar-end"}}
         </div>
     </div>
 </nav>
