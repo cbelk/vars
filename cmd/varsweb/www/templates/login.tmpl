@@ -1,0 +1,25 @@
+{% raw %}
+
+{{define "login"}}
+{{template "header"}}
+{{template "navbar"}}
+<div class="container">
+    <h2>Sign In</h2>
+    <form action="" id="signInForm" method="post">
+        <div class="form-row">
+            <label for="username">Username</label>
+            <input id="username" maxlength="255" name="username" title="Enter your username" type="text" class="form-control" placeholder="Username" value="" required />
+        </div>
+        <div class="form-row">
+            <label for="password">Password</label>
+            <input autocomplete="off" id="password" name="password" title="Enter your password" type="password" class="form-control" required />
+        </div>
+        <div class="form-row">
+            <button class="btn btn-primary" type="submit">Sign In</button>
+        </div>
+    </form>
+</div>
+{{template "footer"}}
+{{end}}
+
+{% endraw %}

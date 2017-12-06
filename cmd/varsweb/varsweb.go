@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bufio"
+	//"bufio"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+	//"os"
 
 	"github.com/alexedwards/scs"
 	"github.com/cbelk/vars"
@@ -16,11 +16,10 @@ import (
 
 var (
 	db             *sql.DB
-	authenticate   func(string, string) (bool, error)
 	sessionManager *scs.Manager
 )
 
-const webroot string = "/var/www/html"
+//const webroot string = "/var/www"
 
 func main() {
 	// Read in the configurations
@@ -28,7 +27,11 @@ func main() {
 	ReadWebConfig()
 
 	// Load the authentication plugin
-	authenticate = LoadAuth()
+	//authenticate = LoadAuth()
+	LoadAuth()
+
+	// Load templates
+	LoadTemplates()
 
 	// Start the database connection
 	db, err := varsapi.ConnectDB()
@@ -42,9 +45,14 @@ func main() {
 
 	// Set paths
 	router := httprouter.New()
-	router.GET("/", LoginGet)
-	router.POST("/", LoginPost)
+	router.GET("/", handleLoginGet)
+	router.POST("/", handleLoginPost)
 	router.GET("/session", DisplaySession)
+
+	// Serve css, javascript and images
+	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
+	router.ServeFiles("/scripts/*filepath", http.Dir(fmt.Sprintf("%s/scripts", webConf.WebRoot)))
+	router.ServeFiles("/images/*filepath", http.Dir(fmt.Sprintf("%s/images", webConf.WebRoot)))
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
 }
@@ -58,20 +66,17 @@ func DisplaySession(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	w.Write([]byte(fmt.Sprintf("authed: %v\nempObject: %v\n", authed, emp)))
 }
 
-// LoginGet serves the login page.
-func LoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	file, err := os.Open(fmt.Sprintf("%s/login.html", webroot))
-	if err != nil {
-		w.WriteHeader(404)
-	}
-	defer file.Close()
+// handleLoginGet serves the login page.
+func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Add("Content-Type", "text/html")
-	br := bufio.NewReader(file)
-	br.WriteTo(w)
+	err := templates.Lookup("login").Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Error with templating", http.StatusInternalServerError)
+	}
 }
 
-// LoginPost uses the Authenticate function of the auth plugin to validate the user credentials.
-func LoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+// handleLoginPost uses the Authenticate function of the auth plugin to validate the user credentials.
+func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	u := r.FormValue("username")
 	p := r.FormValue("password")
 	authed, err := authenticate(u, p)
