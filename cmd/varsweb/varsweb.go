@@ -97,7 +97,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			w.WriteHeader(500)
 		}
-		w.Write([]byte("Sucessful login"))
+		http.Redirect(w, r, "/session", http.StatusFound)
 	} else {
 		err = session.PutBool(w, "authed", false)
 		if err != nil {
@@ -108,7 +108,10 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			w.WriteHeader(500)
 		}
-		w.Write([]byte("Invalid credentials"))
+		err := templates.Lookup("login-failed").Execute(w, nil)
+		if err != nil {
+			http.Error(w, "Error with templating", http.StatusInternalServerError)
+		}
 	}
 }
 

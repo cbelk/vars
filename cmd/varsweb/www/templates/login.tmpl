@@ -4,22 +4,23 @@
 {{template "header"}}
 {{template "navbar"}}
 <div class="container">
-    <h2>Sign In</h2>
-    <form action="" id="signInForm" method="post">
-        <div class="form-row">
-            <label for="username">Username</label>
-            <input id="username" maxlength="255" name="username" title="Enter your username" type="text" class="form-control" placeholder="Username" value="" required />
-        </div>
-        <div class="form-row">
-            <label for="password">Password</label>
-            <input autocomplete="off" id="password" name="password" title="Enter your password" type="password" class="form-control" required />
-        </div>
-        <div class="form-row">
-            <button class="btn btn-primary" type="submit">Sign In</button>
-        </div>
+    <form action="" id="signInForm" class="form-signin" method="post">
+        <h2 class="form-signin-heading text-center">Please Sign In</h2>
+        <label for="username" class="sr-only">Username</label>
+        <input id="username" maxlength="255" name="username" title="Enter your username" type="text" class="form-control" placeholder="Username" value="" required autofocus />
+        <label for="password" class="sr-only">Password</label>
+        <input autocomplete="off" id="password" name="password" title="Enter your password" type="password" class="form-control" placeholder="Password" required />
+        <button class="btn btn-large btn-primary btn-block" type="submit">Sign In</button>
     </form>
 </div>
 {{template "footer"}}
+{{end}}
+
+{{define "login-failed"}}
+{{template "login"}}
+<div class="container">
+    <p class="text-danger text-center">Invalid credentials</p>
+</div>
 {{end}}
 
 {% endraw %}
