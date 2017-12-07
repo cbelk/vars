@@ -1,12 +1,10 @@
 package main
 
 import (
-	//"bufio"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
-	//"os"
 
 	"github.com/alexedwards/scs"
 	"github.com/cbelk/vars"
@@ -19,7 +17,11 @@ var (
 	sessionManager *scs.Manager
 )
 
-//const webroot string = "/var/www"
+// User will hold whether the user is authed and their vars.Employee object.
+type User struct {
+	Authed bool
+	Emp    *vars.Employee
+}
 
 func main() {
 	// Read in the configurations
@@ -59,11 +61,11 @@ func main() {
 
 // *** used for testing -- REMOVE ***
 func DisplaySession(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	authed, emp, err := getSession(r)
+	user, err := getSession(r)
 	if err != nil {
 		w.WriteHeader(500)
 	}
-	w.Write([]byte(fmt.Sprintf("authed: %v\nempObject: %v\n", authed, emp)))
+	w.Write([]byte(fmt.Sprintf("user object: %v\nis user authed: %v\nemployee object: %v", user, user.Authed, user.Emp)))
 }
 
 // handleLoginGet serves the login page.
@@ -77,34 +79,28 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 // handleLoginPost uses the Authenticate function of the auth plugin to validate the user credentials.
 func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	var user User
 	u := r.FormValue("username")
 	p := r.FormValue("password")
 	authed, err := authenticate(u, p)
 	if err != nil {
 		w.WriteHeader(404)
 	}
+	user.Authed = authed
 	session := sessionManager.Load(r)
-	if authed {
+	if user.Authed {
 		emp, err := varsapi.GetEmployeeByUsername(u)
 		if err != nil {
 			w.WriteHeader(500)
 		}
-		err = session.PutBool(w, "authed", true)
-		if err != nil {
-			w.WriteHeader(500)
-		}
-		err = session.PutObject(w, "employee", emp)
+		user.Emp = emp
+		err = session.PutObject(w, "user", user)
 		if err != nil {
 			w.WriteHeader(500)
 		}
 		http.Redirect(w, r, "/session", http.StatusFound)
 	} else {
-		err = session.PutBool(w, "authed", false)
-		if err != nil {
-			w.WriteHeader(500)
-		}
-		var emp vars.Employee
-		err = session.PutObject(w, "employee", emp)
+		err = session.PutObject(w, "user", user)
 		if err != nil {
 			w.WriteHeader(500)
 		}
@@ -116,16 +112,12 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 }
 
 // getSession unpacks the objects from the session cookie associated with the request and returns them.
-func getSession(r *http.Request) (bool, *vars.Employee, error) {
-	var emp vars.Employee
+func getSession(r *http.Request) (*User, error) {
+	var user User
 	session := sessionManager.Load(r)
-	authed, err := session.GetBool("authed")
+	err := session.GetObject("user", &user)
 	if err != nil {
-		return false, &emp, err
+		return &user, err
 	}
-	err = session.GetObject("employee", &emp)
-	if err != nil {
-		return authed, &emp, err
-	}
-	return authed, &emp, nil
+	return &user, nil
 }
