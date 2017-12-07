@@ -5,7 +5,7 @@
 !Makefile
 !LICENSE
 # Ignore binary files
-*.exe
+*.so
 # Ignore Mac DS_Store
 .DS_Store
 vendor/*/
