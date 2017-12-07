@@ -1,0 +1,14 @@
+{% raw %}
+
+{{define "index"}}
+{{template "header"}}
+{{template "navbar" .}}
+{{if .Authed}}
+<div class="container">
+    <p class="text-dark">Hello {{.Emp.FirstName}} {{.Emp.LastName}}!</p>
+</div>
+{{end}}
+{{template "footer"}}
+{{end}}
+
+{% endraw %}
