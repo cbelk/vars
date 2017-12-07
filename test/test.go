@@ -21,11 +21,10 @@ var (
 		{Name: "mtx103", Type: "server", OpSys: "windows 2012", Location: "hosted", Description: "Some other server again"},
 	}
 	emps = []vars.Employee{
-		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it", UserName: "bbarker", Level: 3},
-		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it", UserName: "aturing", Level: 2},
-		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it", UserName: "afranklin", Level: 1},
-		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it", UserName: "pmonch", Level: 2},
-		{FirstName: "Christian", LastName: "Belk", Email: "christian.belk@test.it", UserName: "christianb", Level: 0},
+		{FirstName: "Bob", LastName: "Barker", Email: "bob.barker@test.it", UserName: "user3", Level: 3},
+		{FirstName: "Alan", LastName: "Turing", Email: "alan.turing@test.it", UserName: "user0", Level: 0},
+		{FirstName: "Aretha", LastName: "Franklin", Email: "aretha.franklin@test.it", UserName: "user2", Level: 2},
+		{FirstName: "Pharoahe", LastName: "Monch", Email: "pahroahe.monch@test.it", UserName: "user1", Level: 1},
 	}
 	vulns = []vars.Vulnerability{
 		{Name: "DirtyCOW", Cves: []string{"CVE-2016-5195"}, Cvss: 7.8, CorpScore: 8, CvssLink: vars.VarsNullString{sql.NullString{String: "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?name=CVE-2016-5195&vector=AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H", Valid: true}}, Finder: 1, Initiator: 3, Summary: "This crap is bad!!!", Test: "Look for a cow in the kernel", Mitigation: "Kill it with fire", Dates: vars.VulnDates{Published: vars.VarsNullTime{pq.NullTime{Time: time.Date(2016, time.November, 10, 1, 2, 3, 4, time.UTC), Valid: true}}}, Tickets: []string{"ticket101", "tciket102"}, References: []string{"https://dirtycow.ninja/", "https://nvd.nist.gov/vuln/detail/CVE-2016-5195"}, Exploit: vars.VarsNullString{sql.NullString{String: "https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs", Valid: true}}, Exploitable: vars.VarsNullBool{sql.NullBool{Bool: true, Valid: true}}},
