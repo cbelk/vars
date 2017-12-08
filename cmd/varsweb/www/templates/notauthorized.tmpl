@@ -1,0 +1,27 @@
+{% raw %}
+
+// Not authorized to view a page
+{{define "notauthorized-get"}}
+{{template "header"}}
+{{template "navbar" .}}
+{{if .Authed}}
+<div class="container">
+    <p class="text-danger">You are not authorized to view this page.</p>
+</div>
+{{end}}
+{{template "footer"}}
+{{end}}
+
+// Not authorized to perform an action
+{{define "notauthorized-mutate"}}
+{{template "header"}}
+{{template "navbar" .}}
+{{if .Authed}}
+<div class="container">
+    <p class="text-danger">You are not authorized to perform that action.</p>
+</div>
+{{end}}
+{{template "footer"}}
+{{end}}
+
+{% endraw %}
