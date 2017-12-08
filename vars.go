@@ -19,6 +19,7 @@ const (
 	ssDeleteNote
 	ssDeleteRef
 	ssDeleteTicket
+	ssGetAffected
 	ssGetClosedVulnIDs
 	ssGetCves
 	ssGetEmployee
@@ -91,6 +92,7 @@ var (
 		ssDeleteNote:       "DELETE FROM notes WHERE noteid=$1;",
 		ssDeleteRef:        "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:     "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
+		ssGetAffected:      "SELECT sysid, mitigated FROM affected WHERE vulnid=$1;",
 		ssGetClosedVulnIDs: "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
 		ssGetCves:          "SELECT cve FROM cves WHERE vulnid=$1;",
 		ssGetEmployee:      "SELECT firstname, lastname, email, username, level FROM emp WHERE empid=$1;",
@@ -136,7 +138,7 @@ var (
 		ssUpdateInitDate:   "UPDATE dates SET initiated=$1 WHERE vulnid=$2;",
 		ssUpdateMitDate:    "UPDATE dates SET mitigated=$1 WHERE vulnid=$2;",
 		ssUpdateMitigation: "UPDATE vuln SET mitigation=$1 WHERE vulnid=$2;",
-		ssUpdateNote:       "UPDATE notes SET note=$1, added=$2 WHERE noteid=$3;",
+		ssUpdateNote:       "UPDATE notes SET note=$1 WHERE noteid=$2;",
 		ssUpdatePubDate:    "UPDATE dates SET published=$1 WHERE vulnid=$2;",
 		ssUpdateRefers:     "UPDATE ref SET url=$1 WHERE vulnid=$2 AND url=$3;",
 		ssUpdateSummary:    "UPDATE vuln SET summary=$1 WHERE vulnid=$2;",
@@ -157,6 +159,7 @@ var (
 		ssDeleteNote:       "DeleteNote",
 		ssDeleteRef:        "DeleteRef",
 		ssDeleteTicket:     "DeleteTicket",
+		ssGetAffected:      "GetAffected",
 		ssGetCves:          "GetCves",
 		ssGetEmployee:      "GetEmployee",
 		ssGetEmpID:         "GetEmpID",
@@ -271,6 +274,12 @@ type Vulnerability struct {
 	References  []string       // Reference URLs
 	Exploit     VarsNullString // Exploit for the vulnerability
 	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
+	AffSystems  []*Affected    // Affected systems and whether they have been mitigated
+}
+
+type Affected struct {
+	Sys       System
+	Mitigated bool
 }
 
 // DeleteAffected deletes the row in the affected table with the given vulnid and sysid.
@@ -301,6 +310,35 @@ func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 // GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
 func GetActiveSystems() ([]*System, error) {
 	return execGetRowsSys(ssActiveSystems)
+}
+
+// GetAffected returns a slice of pointers to Affected objects.
+func GetAffected(vid int64) ([]*Affected, error) {
+	affs := []*Affected{}
+	rows, err := queries[ssGetAffected].Query(vid)
+	if err != nil {
+		return affs, newErrFromErr(err, execNames[ssGetAffected])
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var a Affected
+		var m bool
+		var sid int64
+		if err := rows.Scan(&sid, &m); err != nil {
+			return affs, newErrFromErr(err, execNames[ssGetAffected], "rows.Scan")
+		}
+		sys, err := GetSystem(sid)
+		if err != nil {
+			return affs, newErrFromErr(err, execNames[ssGetAffected])
+		}
+		a.Sys = *sys
+		a.Mitigated = m
+		affs = append(affs, &a)
+	}
+	if err := rows.Err(); err != nil {
+		return affs, newErrFromErr(err, execNames[ssGetAffected])
+	}
+	return affs, nil
 }
 
 // GetEmpID returns the empid associated with the employee.
@@ -776,7 +814,7 @@ func UpdateMitigation(tx *sql.Tx, vid int64, mit string) Err {
 
 // UpdateNote will update the note and added date for the given noteid.
 func UpdateNote(tx *sql.Tx, nid int64, note string) Err {
-	return execMutation(tx, ssUpdateNote, note, time.Now(), nid)
+	return execMutation(tx, ssUpdateNote, note, nid)
 }
 
 // UpdatePubDate will update the date that the vulnerability was published for the given vulnerability ID.

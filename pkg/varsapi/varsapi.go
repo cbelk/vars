@@ -515,6 +515,13 @@ func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 		}
 		vuln.Exploit = exploit
 		vuln.Exploitable = exploitable
+
+		// Get affected
+		affs, err := vars.GetAffected(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.AffSystems = affs
 	}
 	return vulns, nil
 }
@@ -573,6 +580,13 @@ func GetVulnerability(vid int64) (*vars.Vulnerability, error) {
 	}
 	vuln.Exploit = exploit
 	vuln.Exploitable = exploitable
+
+	// Get affected
+	affs, err := vars.GetAffected(vuln.ID)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.AffSystems = affs
 
 	return vuln, nil
 }

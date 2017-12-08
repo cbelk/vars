@@ -289,6 +289,10 @@ func testGetClosedVAs() {
 	fmt.Println("Closed vulnerabilities are:")
 	for _, vuln := range vulns {
 		fmt.Println(*vuln)
+		fmt.Printf("\nSystems affected by %v are:\n", vuln.Name)
+		for _, a := range vuln.AffSystems {
+			fmt.Println(*a)
+		}
 	}
 }
 
@@ -316,6 +320,10 @@ func testGetOpenVAs() {
 	fmt.Println("Open vulnerabilities are:")
 	for _, vuln := range vulns {
 		fmt.Println(*vuln)
+		fmt.Printf("\nSystems affected by %v are:\n", vuln.Name)
+		for _, a := range vuln.AffSystems {
+			fmt.Println(*a)
+		}
 	}
 }
 
@@ -347,6 +355,10 @@ func testGetVulnerabilities() {
 	}
 	for _, v := range vulns {
 		fmt.Println(*v)
+		fmt.Printf("\nSystems affected by %v are:\n", v.Name)
+		for _, a := range v.AffSystems {
+			fmt.Println(*a)
+		}
 	}
 }
 
