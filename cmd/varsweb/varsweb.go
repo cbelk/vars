@@ -12,6 +12,13 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+const (
+	AdminUser      = 0
+	PrivilegedUser = 1
+	StandardUser   = 2
+	Reporter       = 3
+)
+
 var (
 	db             *sql.DB
 	sessionManager *scs.Manager
@@ -22,6 +29,17 @@ type User struct {
 	Authed bool
 	Emp    *vars.Employee
 }
+
+/*
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+    if user.Authed {
+    } else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+    }
+*/
 
 func main() {
 	// Read in the configurations
@@ -53,6 +71,7 @@ func main() {
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
+	router.GET("/vulnerabilities", handleVulnerabilities)
 
 	// Serve css, javascript and images
 	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
@@ -126,7 +145,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		http.Redirect(w, r, "/session", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 	} else {
 		err = session.PutObject(w, "user", user)
 		if err != nil {
@@ -147,6 +166,37 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+// handleVulnerabilities serves the vulnerability pages
+func handleVulnerabilities(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if user.Authed {
+		if user.Emp.Level <= StandardUser {
+			vulns, err := varsapi.GetVulnerabilities()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			data := struct {
+				U     *User
+				Vulns []*vars.Vulnerability
+			}{user, vulns}
+			err = templates.Lookup("vulns").Execute(w, data)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
 }
 
 // getSession unpacks the objects from the session cookie associated with the request and returns them.
