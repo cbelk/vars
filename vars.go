@@ -25,6 +25,7 @@ const (
 	ssGetEmps
 	ssGetEmpID
 	ssGetExploit
+	ssGetImpact
 	ssGetNotes
 	ssGetOpenVulnIDs
 	ssGetReferences
@@ -96,6 +97,7 @@ var (
 		ssGetEmpID:         "SELECT empid FROM emp WHERE username=$1;",
 		ssGetEmps:          "SELECT empid, firstname, lastname, email, username, level FROM emp;",
 		ssGetExploit:       "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
+		ssGetImpact:        "SELECT cvss, cvsslink, corpscore FROM impact WHERE vulnid=$1;",
 		ssGetNotes:         "SELECT noteid, empid, added, note FROM notes WHERE vulnid=$1 ORDER BY added ASC;",
 		ssGetOpenVulnIDs:   "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
 		ssGetReferences:    "SELECT url FROM ref WHERE vulnid=$1;",
@@ -161,6 +163,7 @@ var (
 		ssGetEmps:          "GetEmployees",
 		ssGetExploit:       "GetExploit",
 		ssGetClosedVulnIDs: "GetClosedVulnIDs",
+		ssGetImpact:        "GetImpact",
 		ssGetNotes:         "GetNotes",
 		ssGetOpenVulnIDs:   "GetOpenVulnIDs",
 		ssGetReferences:    "GetReferences",
@@ -376,6 +379,18 @@ func GetCves(vid int64) (*[]string, error) {
 		return &c, newErrFromErr(err, execNames[ssGetCves])
 	}
 	return cves, nil
+}
+
+// GetImpact returns the row from the impact table for the given vulnid.
+func GetImpact(vid int64) (float32, VarsNullString, float32, error) {
+	var cvss float32
+	var cvssLink VarsNullString
+	var corpscore float32
+	err := queries[ssGetImpact].QueryRow(vid).Scan(&cvss, &cvssLink, &corpscore)
+	if err != nil {
+		return cvss, cvssLink, corpscore, newErrFromErr(err, execNames[ssGetImpact])
+	}
+	return cvss, cvssLink, corpscore, nil
 }
 
 // GetOpenVulnIDs returns a pointer to a slice of vulnerability IDs that do not have a mitigated date.

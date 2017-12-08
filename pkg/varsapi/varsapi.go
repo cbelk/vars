@@ -471,6 +471,15 @@ func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 	}
 
 	for _, vuln := range vulns {
+		//Get impact
+		cvss, cvssLink, cscore, err := vars.GetImpact(vuln.ID)
+		if !vars.IsNilErr(err) {
+			return vulns, err
+		}
+		vuln.Cvss = cvss
+		vuln.CvssLink = cvssLink
+		vuln.CorpScore = cscore
+
 		// Get dates
 		vd, err := vars.GetVulnDates(vuln.ID)
 		if !vars.IsNilErr(err) {
@@ -519,6 +528,15 @@ func GetVulnerability(vid int64) (*vars.Vulnerability, error) {
 	if !vars.IsNilErr(err) {
 		return &v, err
 	}
+
+	//Get impact
+	cvss, cvssLink, cscore, err := vars.GetImpact(vuln.ID)
+	if !vars.IsNilErr(err) {
+		return &v, err
+	}
+	vuln.Cvss = cvss
+	vuln.CvssLink = cvssLink
+	vuln.CorpScore = cscore
 
 	// Get dates
 	vd, err := vars.GetVulnDates(vid)
