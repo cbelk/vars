@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/alexedwards/scs"
 	"github.com/cbelk/vars"
@@ -71,7 +72,7 @@ func main() {
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
-	router.GET("/vulnerabilities", handleVulnerabilities)
+	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 
 	// Serve css, javascript and images
 	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
@@ -169,24 +170,65 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 // handleVulnerabilities serves the vulnerability pages
-func handleVulnerabilities(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user, err := getSession(r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+	v := ps.ByName("vuln")
 	if user.Authed {
 		if user.Emp.Level <= StandardUser {
-			vulns, err := varsapi.GetVulnerabilities()
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-			data := struct {
-				U     *User
-				Vulns []*vars.Vulnerability
-			}{user, vulns}
-			err = templates.Lookup("vulns").Execute(w, data)
-			if err != nil {
-				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			if v == "all" {
+				vulns, err := varsapi.GetVulnerabilities()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				data := struct {
+					U     *User
+					Vulns []*vars.Vulnerability
+				}{user, vulns}
+				err = templates.Lookup("vulns").Execute(w, data)
+				if err != nil {
+					http.Error(w, "Error with templating", http.StatusInternalServerError)
+				}
+			} else if v == "open" {
+				vulns, err := varsapi.GetOpenVulnerabilities()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				data := struct {
+					U     *User
+					Vulns []*vars.Vulnerability
+				}{user, vulns}
+				err = templates.Lookup("vulns").Execute(w, data)
+				if err != nil {
+					http.Error(w, "Error with templating", http.StatusInternalServerError)
+				}
+			} else if v == "closed" {
+				vulns, err := varsapi.GetClosedVulnerabilities()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				data := struct {
+					U     *User
+					Vulns []*vars.Vulnerability
+				}{user, vulns}
+				err = templates.Lookup("vulns").Execute(w, data)
+				if err != nil {
+					http.Error(w, "Error with templating", http.StatusInternalServerError)
+				}
+			} else {
+				_, err := strconv.Atoi(v)
+				if err != nil {
+					err = templates.Lookup("page-not-exist").Execute(w, user)
+					if err != nil {
+						http.Error(w, "Error with templating", http.StatusInternalServerError)
+					}
+				}
+				err = templates.Lookup("page-not-exist").Execute(w, user)
+				if err != nil {
+					http.Error(w, "Error with templating", http.StatusInternalServerError)
+				}
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
