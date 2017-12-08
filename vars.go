@@ -219,6 +219,13 @@ var (
 	}
 )
 
+// Affected holds a system and whether is has been patched/mitigated for the vulnerability.
+// The vulnerability object will hold a slice of these.
+type Affected struct {
+	Sys       System
+	Mitigated bool
+}
+
 // Employee holds information about an employee
 type Employee struct {
 	ID        int64
@@ -275,11 +282,6 @@ type Vulnerability struct {
 	Exploit     VarsNullString // Exploit for the vulnerability
 	Exploitable VarsNullBool   // Are there currently exploits for the vulnerability
 	AffSystems  []*Affected    // Affected systems and whether they have been mitigated
-}
-
-type Affected struct {
-	Sys       System
-	Mitigated bool
 }
 
 // DeleteAffected deletes the row in the affected table with the given vulnid and sysid.
