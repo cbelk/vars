@@ -1,0 +1,15 @@
+{% raw %}
+
+// vulnerability doesn't exist
+{{define "page-not-exist"}}
+{{template "header"}}
+{{template "navbar" .}}
+{{if .Authed}}
+<div class="container">
+    <p class="text-danger">The requested page does not exist.</p>
+</div>
+{{end}}
+{{template "footer"}}
+{{end}}
+
+{% endraw %}
