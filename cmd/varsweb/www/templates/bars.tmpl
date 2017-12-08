@@ -10,10 +10,24 @@
             </a>
         </div>
         {{if .Authed}}
-        <p class="navbar-text navbar-right"><a href="/logout" class="text-white">logout</a></p>
+        <div class="btn-group">
+                {{if le .Emp.Level 2}}
+                {{template "nav-vuln-drop"}}
+                {{end}}
+        </div>
+        <form><button type="submit" class="btn btn-danger navbar-right" formaction="/logout">Logout</button></form>
         {{end}}
     </div>
 </nav>
+{{end}}
+
+{{define "nav-vuln-drop"}}
+    <button type="button" class="btn btn-dark dropdown-toggle navbar-btn navbar-left" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        Vulnerability <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu">
+        <li><a href="/vulnerabilities" class="text-dark">All Vulnerabilities</a></li>
+    </ul>
 {{end}}
 
 {% endraw %}
