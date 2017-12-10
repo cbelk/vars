@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -218,16 +219,20 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 					http.Error(w, "Error with templating", http.StatusInternalServerError)
 				}
 			} else {
-				_, err := strconv.Atoi(v)
+				vid, err := strconv.Atoi(v)
 				if err != nil {
 					err = templates.Lookup("page-not-exist").Execute(w, user)
 					if err != nil {
 						http.Error(w, "Error with templating", http.StatusInternalServerError)
 					}
 				}
-				err = templates.Lookup("page-not-exist").Execute(w, user)
+				vuln, err := varsapi.GetVulnerability(int64(vid))
 				if err != nil {
-					http.Error(w, "Error with templating", http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = json.NewEncoder(w).Encode(vuln)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
 				}
 			}
 		} else {
