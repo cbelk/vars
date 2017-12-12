@@ -77,6 +77,7 @@ func main() {
 	router.GET("/session", DisplaySession)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
+	router.POST("/vulnerability/:vuln/:field/:old", handleVulnerabilityPost)
 
 	// Serve css, javascript and images
 	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
@@ -268,8 +269,22 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				err := varsapi.UpdateVulnerabilitySummary(db, int64(vid), summ)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
 				}
-				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "cve":
+			if user.Emp.Level <= StandardUser {
+				oldcve := ps.ByName("old")
+				cve := r.FormValue("cve")
+				err := varsapi.UpdateCve(db, int64(vid), oldcve, cve)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}

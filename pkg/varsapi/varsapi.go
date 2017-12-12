@@ -796,6 +796,7 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// UpdateVulnerabilitySummary updates the summary associated with the given vulnid.
 func UpdateVulnerabilitySummary(db *sql.DB, vid int64, summary string) error {
 	// Start transaction and set rollback function
 	tx, err := db.Begin()
@@ -1006,6 +1007,32 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 		return err
 	}
 	err = UpdateReferences(tx, old, vuln)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateCve will update the CVE associated with the row (vid, cve).
+func UpdateCve(db *sql.DB, vid int64, oldcve, newcve string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateCve(tx, vid, oldcve, newcve)
 	if !vars.IsNilErr(err) {
 		return err
 	}

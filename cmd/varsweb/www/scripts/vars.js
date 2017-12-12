@@ -1,12 +1,30 @@
-function hideModalEditDivs() {
-    $('#vuln-modal-div-edit-summary').hide();
+function deleteSubmitHandlers() {
+    $('.submit-cve').off('submit');
 }
 
-function showModalEditDiv(btnID) {
+function hideModalEditSubmit() {
+    $('.submit-cve').hide();
+}
+
+function hideModalEditDivs() {
+    $('#vuln-modal-div-edit-summary').hide();
+    $('.edit-cve-input').attr('readonly');
+    $('.edit-cve-input').addClass('form-control-plaintext');
+    $('.edit-cve-input').removeClass('form-control');
+}
+
+function showModalEditDiv(btnID, num) {
     switch(btnID) {
         case 'vuln-modal-edit-summary':
             $('#vuln-modal-div-summary').hide();
             $('#vuln-modal-div-edit-summary').show();
+            break;
+        case 'cve':
+            $('#vuln-modal-edit-cve-'+num).removeAttr('readonly');
+            $('#vuln-modal-edit-cve-'+num).removeClass('form-control-plaintext');
+            $('#vuln-modal-edit-cve-'+num).addClass('form-control');
+            $('#vuln-modal-edit-cve-'+num+'-submit').show();
+            $('#vuln-modal-edit-cve-'+num+'-btn').hide();
             break;
     }
     $('#vuln-modal-alert-success').hide();
@@ -22,12 +40,35 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-summary-edit').val(vuln.Summary);
     modal.find('#vuln-modal-form-summary').attr('action', '/vulnerability/' + vuln.ID + '/summary');
     modal.find('#vuln-modal-cve-list').empty();
+    modal.find('#vuln-modal-edit-cve-list').empty();
     if (vuln.Cves != null) {
         vuln.Cves.sort();
         for (i = 0; i < vuln.Cves.length; i++) {
-            modal.find('#vuln-modal-cve-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 px-0 mx-0" id="vuln-modal-edit-cve-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <p id="vuln-modal-edit-cve-' + i + '">' + vuln.Cves[i]  + '</p></div>');
+            modal.find('#vuln-modal-cve-list').append('<div id="vuln-modal-div-cve-'+i+'"> <div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 px-0 mx-0" id="vuln-modal-edit-cve-' + i + '-btn" data-edit-btn-group="cve" onclick="showModalEditDiv(\'cve\','+i+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+i+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + i + '"value="' + vuln.Cves[i]  + '" name="cve" data-original="'+vuln.Cves[i]+'"><button type="submit" class="btn btn-dark submit-cve" id="vuln-modal-edit-cve-'+i+'-submit">Submit</button></form></div></div>');
+            modal.find('#vuln-modal-form-cve-'+i).on('submit', {cveid: i}, function(event) {
+                event.preventDefault();
+                var cveid = event.data.cveid;
+                var fdata = $('#vuln-modal-edit-cve-'+cveid).serialize();
+                var vid = $('#vuln-modal-vulnid').text();
+                var cve = $('#vuln-modal-edit-cve-'+cveid).attr('data-original');
+                $.ajax({
+                    type : 'POST',
+                    url  : '/vulnerability/'+vid+'/cve/'+cve+'/',
+                    data : fdata,
+                    success: function(data) {
+                        hideModalEditDivs();
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal-edit-cve-'+cveid+'-submit').hide();
+                        $('#vuln-modal-edit-cve-'+cveid+'-btn').show();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                    }
+                });
+            });
         }
     }
+    hideModalEditSubmit();
     modal.find('#vuln-modal-cvss').text(vuln.Cvss);
     if (vuln.CvssLink == null) {
         modal.find('#vuln-modal-cvss-link').attr('href', 'https://www.first.org/cvss/calculator/3.0');
@@ -72,6 +113,7 @@ function updateVulnModal(vuln, modal) {
 
 $('#vuln-modal').on('show.bs.modal', function (event) {
     hideModalEditDivs();
+    hideModalEditSubmit();
     // Get vulnid
     var row = $(event.relatedTarget);
     var vid = row.data('vid');
@@ -90,6 +132,8 @@ $('#vuln-modal').on('show.bs.modal', function (event) {
 });
 
 $('#vuln-modal').on('hidden.bs.modal', function (event) {
+    hideModalEditDivs();
+    hideModalEditSubmit();
     $('#vuln-modal-vulnid').text('-1');
     $('#vuln-modal-affected-collapse').collapse('hide');
     $('#vuln-modal-div-summary').show();
