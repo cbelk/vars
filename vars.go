@@ -108,7 +108,7 @@ var (
 		ssGetSystemID:      "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssGetTickets:       "SELECT ticket FROM tickets WHERE vulnid=$1;",
 		ssGetVuln:          "SELECT vulnname, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
-		ssGetVulns:         "SELECT vulnid, vulnname, finder, initiator, summary, test, mitigation FROM vuln;",
+		ssGetVulns:         "SELECT vulnid, vulnname, finder, initiator, summary, test, mitigation FROM vuln ORDER BY vulnid;",
 		ssGetVulnDates:     "SELECT published, initiated, mitigated FROM dates WHERE vulnid=$1;",
 		ssGetVulnID:        "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssInsertAffected:   "INSERT INTO affected (vulnid, sysid, mitigated) VALUES ($1, $2, $3);",
