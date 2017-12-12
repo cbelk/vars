@@ -796,6 +796,31 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+func UpdateVulnerabilitySummary(db *sql.DB, vid int64, summary string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSummary(tx, vid, summary)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateVulnerability updates the edited parts of the vulnerability
 func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	// Get the old vulnerability

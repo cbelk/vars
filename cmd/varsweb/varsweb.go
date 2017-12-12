@@ -22,6 +22,7 @@ const (
 )
 
 var (
+	Conf           vars.Config
 	db             *sql.DB
 	sessionManager *scs.Manager
 )
@@ -56,11 +57,12 @@ func main() {
 	LoadTemplates()
 
 	// Start the database connection
-	db, err := varsapi.ConnectDB()
+	var err error
+	db, err = vars.ConnectDB(&Conf)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer varsapi.CloseDB(db)
+	defer vars.CloseDB(db)
 
 	// Create Session Manager
 	sessionManager = scs.NewCookieManager(webConf.Skey)
@@ -74,6 +76,7 @@ func main() {
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
+	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
 
 	// Serve css, javascript and images
 	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
@@ -243,6 +246,34 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	v := ps.ByName("vuln")
+	vid, err := strconv.Atoi(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "summary":
+			if user.Emp.Level <= StandardUser {
+				summ := r.FormValue("summary")
+				err := varsapi.UpdateVulnerabilitySummary(db, int64(vid), summ)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		}
 	}
 }
 
