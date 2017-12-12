@@ -9,8 +9,6 @@ import (
 	"os"
 	"plugin"
 	"strings"
-
-	"github.com/cbelk/vars/pkg/varsapi"
 )
 
 type Config struct {
@@ -79,7 +77,11 @@ func ReadVarsConfig() {
 		}
 		config = def
 	}
-	err := varsapi.ReadConfig(config)
+	file, err := os.Open(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.NewDecoder(file).Decode(&Conf)
 	if err != nil {
 		log.Fatal(err)
 	}
