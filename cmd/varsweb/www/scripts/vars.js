@@ -2,31 +2,6 @@ function hideModalEditDivs() {
     $('#vuln-modal-div-edit-summary').hide();
 }
 
-function postVulnUpdate(formID) {
-    var data = '';
-    var url = '#';
-    var upID = '';
-    var upDIV = '';
-    var vulnid = $('#vuln-modal-vulnid').text();
-    switch(formID) {
-        case 'vuln-modal-form-summary':
-            url = '/vulnerability/' + vulnid + '/summary/';
-            data = $('#vuln-modal-summary-edit').text();
-            upID = '#vuln-modal-summary';
-            upDIV = '#vuln-modal-div-summary';
-            break;
-    }
-    $.post(url, data, function(data, status) {
-        if(status == 200) {
-            $(upID).text(data);
-            $(upDIV).show();
-            hideModalEditDivs();
-        } else {
-            window.alert('There was an error processing your request');
-        }
-    });
-}
-
 function showModalEditDiv(btnID) {
     switch(btnID) {
         case 'vuln-modal-edit-summary':
@@ -34,10 +9,14 @@ function showModalEditDiv(btnID) {
             $('#vuln-modal-div-edit-summary').show();
             break;
     }
+    $('#vuln-modal-alert-success').hide();
+    $('#vuln-modal-alert-danger').hide();
 }
 
 function updateVulnModal(vuln, modal) {
     modal.find('.modal-title').text(vuln.Name);
+    modal.find('#vuln-modal-alert-success').hide();
+    modal.find('#vuln-modal-alert-danger').hide();
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
     modal.find('#vuln-modal-summary').text(vuln.Summary);
     modal.find('#vuln-modal-summary-edit').val(vuln.Summary);
@@ -115,23 +94,30 @@ $('#vuln-modal').on('hidden.bs.modal', function (event) {
     $('#vuln-modal-affected-collapse').collapse('hide');
     $('#vuln-modal-div-summary').show();
     $('#vuln-modal-summary-edit').val('');
+    $('#vuln-modal-alert-success').hide();
+    $('#vuln-modal-alert-danger').hide();
 });
 
 $(document).ready(function() {
 	$('#vuln-modal-form-summary').on('submit', function(event) {
 		event.preventDefault();
 		var fdata = $('#vuln-modal-summary-edit').serialize();
-        var vid = $('#vuln-modal-vulnid').text();
-        var summary = $('#vuln-modal-summary-edit').val();
+		var vid = $('#vuln-modal-vulnid').text();
+		var summary = $('#vuln-modal-summary-edit').val();
 		$.ajax({
 			type : 'POST',
 			url  : $('#vuln-modal-form-summary').attr('action'),
-			data : fdata
-		}).done(function(data) {
-			$('#vuln-modal-summary').text(summary);
-			$('#vuln-modal-div-summary').show();
-			$('#vuln-modal-div-edit-summary').hide();
-			$("tr[data-vid='"+vid+"']").find("td:eq(1)").text(summary);
+			data : fdata,
+			success: function(data) {
+				$('#vuln-modal-summary').text(summary);
+				$('#vuln-modal-div-summary').show();
+				$('#vuln-modal-div-edit-summary').hide();
+				$('#vuln-modal-alert-success').show();
+				$("tr[data-vid='"+vid+"']").find("td:eq(1)").text(summary);
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
 		});
 	});
 });
