@@ -8,6 +8,7 @@ function hideModalEditSubmit() {
 
 function hideModalEditDivs() {
     $('#vuln-modal-div-edit-summary').hide();
+    $('#vuln-modal-div-edit-cvss').hide();
     $('.edit-cve-input').attr('readonly');
     $('.edit-cve-input').addClass('form-control-plaintext');
     $('.edit-cve-input').removeClass('form-control');
@@ -26,6 +27,10 @@ function showModalEditDiv(btnID, num) {
             $('#vuln-modal-edit-cve-'+num+'-submit').show();
             $('#vuln-modal-edit-cve-'+num+'-btn').hide();
             break;
+        case 'vuln-modal-edit-cvss':
+            $('#vuln-modal-div-cvss').hide();
+            $('#vuln-modal-div-edit-cvss').show();
+            break;
     }
     $('#vuln-modal-alert-success').hide();
     $('#vuln-modal-alert-danger').hide();
@@ -36,9 +41,11 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-alert-success').hide();
     modal.find('#vuln-modal-alert-danger').hide();
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
+    // Summary
     modal.find('#vuln-modal-summary').text(vuln.Summary);
     modal.find('#vuln-modal-summary-edit').val(vuln.Summary);
     modal.find('#vuln-modal-form-summary').attr('action', '/vulnerability/' + vuln.ID + '/summary');
+    //CVEs
     modal.find('#vuln-modal-cve-list').empty();
     modal.find('#vuln-modal-edit-cve-list').empty();
     if (vuln.Cves != null) {
@@ -69,12 +76,16 @@ function updateVulnModal(vuln, modal) {
         }
     }
     hideModalEditSubmit();
+    // Cvss
     modal.find('#vuln-modal-cvss').text(vuln.Cvss);
+    modal.find('#vuln-modal-cvss-edit').attr('value', vuln.Cvss);
     if (vuln.CvssLink == null) {
         modal.find('#vuln-modal-cvss-link').attr('href', 'https://www.first.org/cvss/calculator/3.0');
     } else {
         modal.find('#vuln-modal-cvss-link').attr('href', vuln.CvssLink);
+        modal.find('#vuln-modal-cvss-link-edit').attr('value', vuln.CvssLink);
     }
+    // CorpScore
     modal.find('#vuln-modal-corp-score').text(vuln.CorpScore);
     modal.find('#vuln-modal-test').text(vuln.Test);
     modal.find('#vuln-modal-mitigation').text(vuln.Mitigation);
@@ -138,6 +149,9 @@ $('#vuln-modal').on('hidden.bs.modal', function (event) {
     $('#vuln-modal-affected-collapse').collapse('hide');
     $('#vuln-modal-div-summary').show();
     $('#vuln-modal-summary-edit').val('');
+    $('#vuln-modal-div-cvss').show();
+    $('#vuln-modal-cvss-edit').attr('value', '');
+    $('#vuln-modal-cvss-link-edit').attr('value', '');
     $('#vuln-modal-alert-success').hide();
     $('#vuln-modal-alert-danger').hide();
 });
@@ -158,6 +172,29 @@ $(document).ready(function() {
 				$('#vuln-modal-div-edit-summary').hide();
 				$('#vuln-modal-alert-success').show();
 				$("tr[data-vid='"+vid+"']").find("td:eq(1)").text(summary);
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+		});
+	});
+	$('#vuln-modal-form-cvss').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-cvss').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		var cvssScore = $('#vuln-modal-cvss-edit').val();
+		var cvssLink = $('#vuln-modal-cvss-link-edit').val();
+		$.ajax({
+			type : 'POST',
+			url  : '/vulnerability/'+vid+'/cvss',
+			data : fdata,
+			success: function(data) {
+				$('#vuln-modal-cvss').text(cvssScore);
+				$('#vuln-modal-cvss').attr('href', cvssLink);
+				$('#vuln-modal-div-cvss').show();
+				$('#vuln-modal-div-edit-cvss').hide();
+				$('#vuln-modal-alert-success').show();
+				$("tr[data-vid='"+vid+"']").find("td:eq(2)").text(cvssScore);
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

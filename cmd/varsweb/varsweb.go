@@ -288,6 +288,24 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "cvss":
+			if user.Emp.Level <= StandardUser {
+				cvssScore := r.FormValue("cvssScore")
+				cvssLink := r.FormValue("cvssLink")
+				cScore, err := strconv.ParseFloat(cvssScore, 32)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					err := varsapi.UpdateCvss(db, int64(vid), float32(cScore), cvssLink)
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+					} else {
+						w.WriteHeader(http.StatusOK)
+					}
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		}
 	}
 }

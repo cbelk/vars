@@ -633,6 +633,46 @@ func UpdateAffected(db *sql.DB, vid, sid int64, mit bool) error {
 	return nil
 }
 
+// UpdateCvss will update the cvss score and link if they have been changed.
+func UpdateCvss(db *sql.DB, vid int64, cvss float32, link string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	c, cl, _, err := vars.GetImpact(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	if cvss != c {
+		err = vars.UpdateCvss(tx, vid, cvss)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if (cl.Valid && link != cl.String) || !cl.Valid {
+		vnl := GetVarsNullString(link)
+		err = vars.UpdateCvssLink(tx, vid, vnl)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateEmployee will update the row in the emp table with the new employee information.
 func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	// Get the old employee
