@@ -9,6 +9,7 @@ function hideModalEditSubmit() {
 function hideModalEditDivs() {
     $('#vuln-modal-div-edit-summary').hide();
     $('#vuln-modal-div-edit-cvss').hide();
+    $('#vuln-modal-div-edit-corpscore').hide();
     $('.edit-cve-input').attr('readonly');
     $('.edit-cve-input').addClass('form-control-plaintext');
     $('.edit-cve-input').removeClass('form-control');
@@ -30,6 +31,10 @@ function showModalEditDiv(btnID, num) {
         case 'vuln-modal-edit-cvss':
             $('#vuln-modal-div-cvss').hide();
             $('#vuln-modal-div-edit-cvss').show();
+            break;
+        case 'vuln-modal-edit-corpscore':
+            $('#vuln-modal-div-corpscore').hide();
+            $('#vuln-modal-div-edit-corpscore').show();
             break;
     }
     $('#vuln-modal-alert-success').hide();
@@ -125,9 +130,13 @@ function updateVulnModal(vuln, modal) {
         modal.find('#vuln-modal-cvss-link-edit').attr('value', vuln.CvssLink);
     }
     // CorpScore
-    modal.find('#vuln-modal-corp-score').text(vuln.CorpScore);
+    modal.find('#vuln-modal-corpscore').text(vuln.CorpScore);
+    modal.find('#vuln-modal-corpscore-edit').val(vuln.CorpScore);
+    // Test
     modal.find('#vuln-modal-test').text(vuln.Test);
+    // Mitigation
     modal.find('#vuln-modal-mitigation').text(vuln.Mitigation);
+    // Initiated
     modal.find('#vuln-modal-initiated').text(vuln.Dates.Initiated);
     if (vuln.Dates.Mitigated == null) {
         modal.find('#vuln-modal-mitigated').text('');
@@ -236,6 +245,27 @@ $(document).ready(function() {
 				$('#vuln-modal-div-edit-cvss').hide();
 				$('#vuln-modal-alert-success').show();
 				$("tr[data-vid='"+vid+"']").find("td:eq(2)").text(cvssScore);
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+		});
+	});
+	$('#vuln-modal-form-corpscore').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-corpscore').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		var corpscore = $('#vuln-modal-corpscore-edit').val();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/corpscore',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-corpscore').text(corpscore);
+				$('#vuln-modal-div-corpscore').show();
+				$('#vuln-modal-div-edit-corpscore').hide();
+				$('#vuln-modal-alert-success').show();
+				$("tr[data-vid='"+vid+"']").find("td:eq(3)").text(corpscore);
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

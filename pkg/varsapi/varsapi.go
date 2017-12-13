@@ -1085,6 +1085,32 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	return nil
 }
 
+// UpdateCorpscore will update the corpscore associated with the given vulnid.
+func UpdateCorpScore(db *sql.DB, vid int64, corpscore float32) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateCorpScore(tx, vid, corpscore)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateCve will update the CVE associated with the row (vid, cve).
 func UpdateCve(db *sql.DB, vid int64, oldcve, newcve string) error {
 	// Start transaction and set rollback function

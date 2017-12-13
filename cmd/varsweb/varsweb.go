@@ -33,17 +33,6 @@ type User struct {
 	Emp    *vars.Employee
 }
 
-/*
-	user, err := getSession(r)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-    if user.Authed {
-    } else {
-		http.Redirect(w, r, "/login", http.StatusFound)
-    }
-*/
-
 func main() {
 	// Read in the configurations
 	ReadVarsConfig()
@@ -329,6 +318,23 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 					w.WriteHeader(http.StatusInternalServerError)
 				} else {
 					err := varsapi.UpdateCvss(db, int64(vid), float32(cScore), cvssLink)
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+					} else {
+						w.WriteHeader(http.StatusOK)
+					}
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "corpscore":
+			if user.Emp.Level <= StandardUser {
+				corpscore := r.FormValue("corpscore")
+				cScore, err := strconv.ParseFloat(corpscore, 32)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					err := varsapi.UpdateCorpScore(db, int64(vid), float32(cScore))
 					if err != nil {
 						w.WriteHeader(http.StatusInternalServerError)
 					} else {
