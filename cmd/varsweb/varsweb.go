@@ -65,6 +65,7 @@ func main() {
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
+	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
 	router.POST("/vulnerability/:vuln/:field/:item", handleVulnerabilityPost)
 	router.DELETE("/vulnerability/:vuln/:field/:item", handleVulnerabilityDelete)
@@ -233,6 +234,37 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	v := ps.ByName("vuln")
+	vid, err := strconv.Atoi(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "cve":
+			if user.Emp.Level <= StandardUser {
+				cve := r.FormValue("cve")
+				err := varsapi.AddCve(db, int64(vid), cve)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
 			}
 		}
 	} else {

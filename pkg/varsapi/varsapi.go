@@ -37,6 +37,33 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	return nil
 }
 
+// AddCve adds the given cve to the impact table for vulnid
+func AddCve(db *sql.DB, vid int64, cve string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.InsertCve(tx, vid, cve)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // AddEmployee inserts a new employee into the database.
 func AddEmployee(db *sql.DB, emp *vars.Employee) error {
 	//Start transaction and set rollback function
