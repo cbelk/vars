@@ -36,10 +36,50 @@ function showModalEditDiv(btnID, num) {
     $('#vuln-modal-alert-danger').hide();
 }
 
+function showModalDelete(btnID, num) {
+    switch(btnID) {
+        case 'cve':
+            var cve = $('#vuln-modal-edit-cve-'+num).attr('data-original');
+            $('#vuln-modal-alert-warning-item').text('Delete '+cve+'?');
+            $('#vuln-modal-alert-warning').show();
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("cve", "yes", "'+cve+'", "'+num+'")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("cve", "no", "'+cve+'", "'+num+'")');
+            break;
+    }
+}
+
+function handlePromptChoice(btnId, choice, item, itemID) {
+    switch(btnId) {
+        case 'cve':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method : 'DELETE',
+                    url    : '/vulnerability/'+vid+'/cve/'+item,
+                    success: function(data) {
+                        hideModalEditDivs();
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal-div-cve-'+itemID).hide();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                    }
+                });
+            }
+            $('#vuln-modal-alert-warning-item').text('');
+            $('#vuln-modal-alert-warning').hide();
+            $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
+            $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
+            break;
+    }
+}
+
 function updateVulnModal(vuln, modal) {
     modal.find('.modal-title').text(vuln.Name);
     modal.find('#vuln-modal-alert-success').hide();
     modal.find('#vuln-modal-alert-danger').hide();
+    modal.find('#vuln-modal-alert-warning').hide();
+    modal.find('#vuln-modal-alert-warning-item').text('');
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
     // Summary
     modal.find('#vuln-modal-summary').text(vuln.Summary);
@@ -47,11 +87,10 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-form-summary').attr('action', '/vulnerability/' + vuln.ID + '/summary');
     //CVEs
     modal.find('#vuln-modal-cve-list').empty();
-    modal.find('#vuln-modal-edit-cve-list').empty();
     if (vuln.Cves != null) {
         vuln.Cves.sort();
         for (i = 0; i < vuln.Cves.length; i++) {
-            modal.find('#vuln-modal-cve-list').append('<div id="vuln-modal-div-cve-'+i+'"> <div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 px-0 mx-0" id="vuln-modal-edit-cve-' + i + '-btn" data-edit-btn-group="cve" onclick="showModalEditDiv(\'cve\','+i+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+i+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + i + '"value="' + vuln.Cves[i]  + '" name="cve" data-original="'+vuln.Cves[i]+'"><button type="submit" class="btn btn-dark submit-cve" id="vuln-modal-edit-cve-'+i+'-submit">Submit</button></form></div></div>');
+            modal.find('#vuln-modal-cve-list').append('<div id="vuln-modal-div-cve-'+i+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0" id="vuln-modal-edit-cve-' + i + '-btn" data-edit-btn-group="cve" onclick="showModalEditDiv(\'cve\','+i+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0" id="vuln-modal-delete-cve-' + i + '-btn" data-delete-btn-group="cve" onclick="showModalDelete(\'cve\','+i+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+i+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + i + '"value="' + vuln.Cves[i]  + '" name="cve" data-original="'+vuln.Cves[i]+'"><button type="submit" class="btn btn-dark submit-cve" id="vuln-modal-edit-cve-'+i+'-submit">Submit</button></form></div></div>');
             modal.find('#vuln-modal-form-cve-'+i).on('submit', {cveid: i}, function(event) {
                 event.preventDefault();
                 var cveid = event.data.cveid;
@@ -59,9 +98,9 @@ function updateVulnModal(vuln, modal) {
                 var vid = $('#vuln-modal-vulnid').text();
                 var cve = $('#vuln-modal-edit-cve-'+cveid).attr('data-original');
                 $.ajax({
-                    type : 'POST',
-                    url  : '/vulnerability/'+vid+'/cve/'+cve+'/',
-                    data : fdata,
+                    method : 'POST',
+                    url    : '/vulnerability/'+vid+'/cve/'+cve,
+                    data   : fdata,
                     success: function(data) {
                         hideModalEditDivs();
                         $('#vuln-modal-alert-success').show();
@@ -154,6 +193,8 @@ $('#vuln-modal').on('hidden.bs.modal', function (event) {
     $('#vuln-modal-cvss-link-edit').attr('value', '');
     $('#vuln-modal-alert-success').hide();
     $('#vuln-modal-alert-danger').hide();
+    $('#vuln-modal-alert-warning').hide();
+    $('#vuln-modal-alert-warning-item').text('');
 });
 
 $(document).ready(function() {
@@ -163,9 +204,9 @@ $(document).ready(function() {
 		var vid = $('#vuln-modal-vulnid').text();
 		var summary = $('#vuln-modal-summary-edit').val();
 		$.ajax({
-			type : 'POST',
-			url  : $('#vuln-modal-form-summary').attr('action'),
-			data : fdata,
+			method : 'POST',
+			url    : $('#vuln-modal-form-summary').attr('action'),
+			data   : fdata,
 			success: function(data) {
 				$('#vuln-modal-summary').text(summary);
 				$('#vuln-modal-div-summary').show();
@@ -185,9 +226,9 @@ $(document).ready(function() {
 		var cvssScore = $('#vuln-modal-cvss-edit').val();
 		var cvssLink = $('#vuln-modal-cvss-link-edit').val();
 		$.ajax({
-			type : 'POST',
-			url  : '/vulnerability/'+vid+'/cvss',
-			data : fdata,
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/cvss',
+			data   : fdata,
 			success: function(data) {
 				$('#vuln-modal-cvss').text(cvssScore);
 				$('#vuln-modal-cvss').attr('href', cvssLink);

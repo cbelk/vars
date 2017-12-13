@@ -77,7 +77,8 @@ func main() {
 	router.GET("/session", DisplaySession)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
-	router.POST("/vulnerability/:vuln/:field/:old", handleVulnerabilityPost)
+	router.POST("/vulnerability/:vuln/:field/:item", handleVulnerabilityPost)
+	router.DELETE("/vulnerability/:vuln/:field/:item", handleVulnerabilityDelete)
 
 	// Serve css, javascript and images
 	router.ServeFiles("/styles/*filepath", http.Dir(fmt.Sprintf("%s/styles", webConf.WebRoot)))
@@ -250,6 +251,37 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 }
 
+func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	v := ps.ByName("vuln")
+	vid, err := strconv.Atoi(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "cve":
+			if user.Emp.Level <= StandardUser {
+				cve := ps.ByName("item")
+				err := varsapi.DeleteCve(db, int64(vid), cve)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
 func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user, err := getSession(r)
 	if err != nil {
@@ -277,7 +309,7 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 		case "cve":
 			if user.Emp.Level <= StandardUser {
-				oldcve := ps.ByName("old")
+				oldcve := ps.ByName("item")
 				cve := r.FormValue("cve")
 				err := varsapi.UpdateCve(db, int64(vid), oldcve, cve)
 				if err != nil {

@@ -325,6 +325,33 @@ func DeleteAffected(db *sql.DB, vid, sid int64) error {
 	return nil
 }
 
+// DeleteCve will delete the row (vulnid, cve).
+func DeleteCve(db *sql.DB, vid int64, cve string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.DeleteCve(tx, vid, cve)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // DeleteNote deletes the note with the given noteid.
 func DeleteNote(db *sql.DB, nid int64) error {
 	//Start transaction and set rollback function
