@@ -38,6 +38,9 @@ function hideModalEdit() {
     $('#vuln-modal-summary').attr('readonly', true);
     $('#vuln-modal-summary').addClass('form-control-plaintext');
     $('#vuln-modal-summary').removeClass('form-control');
+    $('#vuln-modal-test').attr('readonly', true);
+    $('#vuln-modal-test').addClass('form-control-plaintext');
+    $('#vuln-modal-test').removeClass('form-control');
     $('.edit-cve-input').attr('readonly', true);
     $('.edit-cve-input').addClass('form-control-plaintext');
     $('.edit-cve-input').removeClass('form-control');
@@ -92,6 +95,16 @@ function showModalEdit(btnID, num) {
                 $('#vuln-modal-corpscore').removeClass('form-control-plaintext');
                 $('#vuln-modal-corpscore').addClass('form-control');
                 $('#vuln-modal-form-corpscore button').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
+        case 'vuln-modal-edit-test':
+            if ($('#vuln-modal-test').is('[readonly]')) {
+                $('#vuln-modal-test').removeAttr('readonly');
+                $('#vuln-modal-test').removeClass('form-control-plaintext');
+                $('#vuln-modal-test').addClass('form-control');
+                $('#vuln-modal-form-test button').show();
             } else {
                 hideModalEdit();
             }
@@ -168,7 +181,6 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
     // Summary
     modal.find('#vuln-modal-summary').text(vuln.Summary);
-    modal.find('#vuln-modal-form-summary').attr('action', '/vulnerability/' + vuln.ID + '/summary');
     //CVEs
     modal.find('#vuln-modal-cve-list').empty();
     if (vuln.Cves != null) {
@@ -338,7 +350,7 @@ $(document).ready(function() {
 		var summary = $('#vuln-modal-summary').text();
 		$.ajax({
 			method : 'POST',
-			url    : $('#vuln-modal-form-summary').attr('action'),
+			url    : '/vulnerability/'+vid+'/summary',
 			data   : fdata,
 			success: function(data) {
                 hideModalEdit();
@@ -407,6 +419,24 @@ $(document).ready(function() {
                 var cveID = $('#vuln-modal-cve-list').children().length - 1;
                 appendCve(cve, cveID);
                 hideModalEdit();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+		});
+	});
+	$('#vuln-modal-form-test').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-test').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		var test = $('#vuln-modal-test').text();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/test',
+			data   : fdata,
+			success: function(data) {
+                hideModalEdit();
+				$('#vuln-modal-alert-success').show();
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

@@ -936,6 +936,32 @@ func UpdateVulnerabilitySummary(db *sql.DB, vid int64, summary string) error {
 	return nil
 }
 
+// UpdateVulnerabilityTest will update the test associated with the given vulnid.
+func UpdateVulnerabilityTest(db *sql.DB, vid int64, test string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateTest(tx, vid, test)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateVulnerability updates the edited parts of the vulnerability
 func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	// Get the old vulnerability

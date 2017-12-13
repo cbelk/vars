@@ -396,6 +396,18 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "test":
+			if user.Emp.Level <= StandardUser {
+				test := r.FormValue("test")
+				err := varsapi.UpdateVulnerabilityTest(db, int64(vid), test)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		}
 	}
 }
