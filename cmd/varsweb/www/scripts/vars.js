@@ -180,7 +180,7 @@ function updateVulnModal(vuln, modal) {
     modal.find('.modal-title').text(vuln.Name);
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
     // Summary
-    modal.find('#vuln-modal-summary').text(vuln.Summary);
+    modal.find('#vuln-modal-summary').val(vuln.Summary);
     //CVEs
     modal.find('#vuln-modal-cve-list').empty();
     if (vuln.Cves != null) {
@@ -201,7 +201,7 @@ function updateVulnModal(vuln, modal) {
     // CorpScore
     modal.find('#vuln-modal-corpscore').val(vuln.CorpScore);
     // Test
-    modal.find('#vuln-modal-test').text(vuln.Test);
+    modal.find('#vuln-modal-test').val(vuln.Test);
     // Mitigation
     modal.find('#vuln-modal-mitigation').text(vuln.Mitigation);
     // Initiated
@@ -347,7 +347,7 @@ $(document).ready(function() {
 		event.preventDefault();
 		var fdata = $('#vuln-modal-form-summary').serialize();
 		var vid = $('#vuln-modal-vulnid').text();
-		var summary = $('#vuln-modal-summary').text();
+		var summary = $('#vuln-modal-summary').val();
 		$.ajax({
 			method : 'POST',
 			url    : '/vulnerability/'+vid+'/summary',
@@ -429,7 +429,7 @@ $(document).ready(function() {
 		event.preventDefault();
 		var fdata = $('#vuln-modal-form-test').serialize();
 		var vid = $('#vuln-modal-vulnid').text();
-		var test = $('#vuln-modal-test').text();
+		var test = $('#vuln-modal-test').val();
 		$.ajax({
 			method : 'POST',
 			url    : '/vulnerability/'+vid+'/test',
