@@ -32,6 +32,8 @@ function handleModalAddItem(btnID) {
 }
 
 function showModalEditDiv(btnID, num) {
+    hideModalEditDivs();
+    hideModalEditSubmit();
     switch(btnID) {
         case 'vuln-modal-edit-summary':
             $('#vuln-modal-div-summary').hide();
@@ -95,7 +97,7 @@ function handlePromptChoice(btnId, choice, item, itemID) {
 }
 
 function appendCve(cve, num) {
-    $('#vuln-modal-cve-list').append('<div id="vuln-modal-div-cve-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0" id="vuln-modal-edit-cve-' + num + '-btn" data-edit-btn-group="cve" onclick="showModalEditDiv(\'cve\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0" id="vuln-modal-delete-cve-' + num + '-btn" data-delete-btn-group="cve" onclick="showModalDelete(\'cve\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+num+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + num + '"value="' + cve + '" name="cve" data-original="'+cve+'"><button type="submit" class="btn btn-dark submit-cve" id="vuln-modal-edit-cve-'+num+'-submit">Submit</button></form></div></div>');
+    $('#vuln-modal-cve-list').append('<div id="vuln-modal-div-cve-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-cve" id="vuln-modal-edit-cve-' + num + '-btn" data-edit-btn-group="cve" onclick="showModalEditDiv(\'cve\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-cve" id="vuln-modal-delete-cve-' + num + '-btn" data-delete-btn-group="cve" onclick="showModalDelete(\'cve\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+num+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + num + '"value="' + cve + '" name="cve" data-original="'+cve+'"><button type="submit" class="btn btn-dark submit-cve" id="vuln-modal-edit-cve-'+num+'-submit">Submit</button></form></div></div>');
     $('#vuln-modal-form-cve-'+num).on('submit', {cveid: num}, function(event) {
         event.preventDefault();
         var cveid = event.data.cveid;
@@ -162,12 +164,12 @@ function updateVulnModal(vuln, modal) {
     if (vuln.Tickets != null) {
         vuln.Tickets.sort();
         for (i = 0; i < vuln.Tickets.length; i++) {
-            modal.find('#vuln-modal-tickets-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 px-0 mx-0" id="vuln-modal-edit-ticket-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <p id="vuln-modal-edit-ticket-' + i + '">' + vuln.Tickets[i]  + '</p></div>');
+            modal.find('#vuln-modal-tickets-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-tickets" id="vuln-modal-edit-ticket-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <p id="vuln-modal-edit-ticket-' + i + '">' + vuln.Tickets[i]  + '</p></div>');
         }
     }
     modal.find('#vuln-modal-ref-list').empty();
     for (i = 0; i < vuln.References.length; i++) {
-        modal.find('#vuln-modal-ref-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 px-0 mx-0" id="vuln-modal-edit-ref-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <a id="vuln-modal-edit-ref-' + i + '" href="' + vuln.References[i] + '" class="text-primary">' + vuln.References[i]  + '</a></div>');
+        modal.find('#vuln-modal-ref-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-refs" id="vuln-modal-edit-ref-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <a id="vuln-modal-edit-ref-' + i + '" href="' + vuln.References[i] + '" class="text-primary">' + vuln.References[i]  + '</a></div>');
     }
     if (vuln.Exploitable == null) {
         modal.find('#vuln-modal-exploitable').text('false');
@@ -186,9 +188,6 @@ function updateVulnModal(vuln, modal) {
 }
 
 $('#vuln-modal').on('show.bs.modal', function (event) {
-    hideModalEditDivs();
-    hideModalEditSubmit();
-    hideAlerts();
     // Get vulnid
     var row = $(event.relatedTarget);
     var vid = row.data('vid');
@@ -200,6 +199,10 @@ $('#vuln-modal').on('show.bs.modal', function (event) {
         if(this.readyState == 4 && this.status == 200) {
             var vuln = JSON.parse(this.responseText);
             updateVulnModal(vuln, modal);
+            hideModalEditDivs();
+            hideModalEditSubmit();
+            hideAlerts();
+            $('.vme-btn').hide();
         }
     };
     req.open('GET', '/vulnerability/' + vid, true);
@@ -218,6 +221,76 @@ $('#vuln-modal').on('hidden.bs.modal', function (event) {
     $('#vuln-modal-cvss-edit').attr('value', '');
     $('#vuln-modal-cvss-link-edit').attr('value', '');
 });
+
+$('#vuln-modal-section-summary').hover(function() {
+        $('.vme-btn-summary').show();
+    }, function() {
+        $('.vme-btn-summary').hide();
+    }
+);
+
+$('#vuln-modal-section-cve').hover(function() {
+        $('.vme-btn-cve').show();
+    }, function() {
+        $('.vme-btn-cve').hide();
+    }
+);
+
+$('#vuln-modal-section-cvss').hover(function() {
+        $('.vme-btn-cvss').show();
+    }, function() {
+        $('.vme-btn-cvss').hide();
+    }
+);
+
+$('#vuln-modal-section-corpscore').hover(function() {
+        $('.vme-btn-corpscore').show();
+    }, function() {
+        $('.vme-btn-corpscore').hide();
+    }
+);
+
+$('#vuln-modal-section-test').hover(function() {
+        $('.vme-btn-test').show();
+    }, function() {
+        $('.vme-btn-test').hide();
+    }
+);
+
+$('#vuln-modal-section-mitigation').hover(function() {
+        $('.vme-btn-mitigation').show();
+    }, function() {
+        $('.vme-btn-mitigation').hide();
+    }
+);
+
+$('#vuln-modal-section-tickets').hover(function() {
+        $('.vme-btn-tickets').show();
+    }, function() {
+        $('.vme-btn-tickets').hide();
+    }
+);
+
+$('#vuln-modal-section-refs').hover(function() {
+        $('.vme-btn-refs').show();
+    }, function() {
+        $('.vme-btn-refs').hide();
+    }
+);
+
+$('#vuln-modal-section-exploitable').hover(function() {
+        $('.vme-btn-exploitable').show();
+    }, function() {
+        $('.vme-btn-exploitable').hide();
+    }
+);
+
+$('#vuln-modal-section-exploit').hover(function() {
+        $('.vme-btn-exploit').show();
+    }, function() {
+        $('.vme-btn-exploit').hide();
+    }
+);
 
 $(document).ready(function() {
 	$('#vuln-modal-form-summary').on('submit', function(event) {
