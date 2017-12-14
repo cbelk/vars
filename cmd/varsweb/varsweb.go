@@ -286,6 +286,18 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "ticket":
+			if user.Emp.Level <= StandardUser {
+				ticket := r.FormValue("ticket")
+				err := varsapi.AddTicket(db, int64(vid), ticket)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -309,6 +321,18 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			if user.Emp.Level <= StandardUser {
 				cve := ps.ByName("item")
 				err := varsapi.DeleteCve(db, int64(vid), cve)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "ticket":
+			if user.Emp.Level <= StandardUser {
+				ticket := ps.ByName("item")
+				err := varsapi.DeleteTicket(db, int64(vid), ticket)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				} else {
@@ -400,6 +424,31 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			if user.Emp.Level <= StandardUser {
 				test := r.FormValue("test")
 				err := varsapi.UpdateVulnerabilityTest(db, int64(vid), test)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "mitigation":
+			if user.Emp.Level <= StandardUser {
+				mitigation := r.FormValue("mitigation")
+				err := varsapi.UpdateVulnerabilityMitigation(db, int64(vid), mitigation)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "ticket":
+			if user.Emp.Level <= StandardUser {
+				oldticket := ps.ByName("item")
+				ticket := r.FormValue("ticket")
+				err := varsapi.UpdateTicket(db, int64(vid), oldticket, ticket)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				} else {

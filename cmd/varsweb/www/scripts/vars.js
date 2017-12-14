@@ -18,9 +18,9 @@
 //                                                                                  //
 //////////////////////////////////////////////////////////////////////////////////////
 
-function deleteSubmitHandlers() {
-    $('.submit-cve').off('submit');
-}
+//function deleteSubmitHandlers() {
+//    $('.submit-cve').off('submit');
+//}
 
 function hideAlerts() {
     $('#vuln-modal-alert-success').hide();
@@ -31,6 +31,7 @@ function hideAlerts() {
 
 function hideModalEdit() {
     $('#vuln-modal-div-add-cve').hide();
+    $('#vuln-modal-div-add-ticket').hide();
     $('#vuln-modal-div-edit-cvss').hide();
     $('#vuln-modal-corpscore').attr('readonly', true);
     $('#vuln-modal-corpscore').addClass('form-control-plaintext');
@@ -41,9 +42,15 @@ function hideModalEdit() {
     $('#vuln-modal-test').attr('readonly', true);
     $('#vuln-modal-test').addClass('form-control-plaintext');
     $('#vuln-modal-test').removeClass('form-control');
+    $('#vuln-modal-mitigation').attr('readonly', true);
+    $('#vuln-modal-mitigation').addClass('form-control-plaintext');
+    $('#vuln-modal-mitigation').removeClass('form-control');
     $('.edit-cve-input').attr('readonly', true);
     $('.edit-cve-input').addClass('form-control-plaintext');
     $('.edit-cve-input').removeClass('form-control');
+    $('.edit-ticket-input').attr('readonly', true);
+    $('.edit-ticket-input').addClass('form-control-plaintext');
+    $('.edit-ticket-input').removeClass('form-control');
     $('.vme-btn-submit').hide();
 }
 
@@ -54,6 +61,13 @@ function handleModalAddItem(btnID) {
                 $('#vuln-modal-div-add-cve').show();
             } else {
                 $('#vuln-modal-div-add-cve').hide();
+            }
+            break;
+        case 'vuln-modal-add-ticket':
+            if ($('#vuln-modal-div-add-ticket').is(':hidden')) {
+                $('#vuln-modal-div-add-ticket').show();
+            } else {
+                $('#vuln-modal-div-add-ticket').hide();
             }
             break;
     }
@@ -109,17 +123,45 @@ function showModalEdit(btnID, num) {
                 hideModalEdit();
             }
             break;
+        case 'vuln-modal-edit-mitigation':
+            if ($('#vuln-modal-mitigation').is('[readonly]')) {
+                $('#vuln-modal-mitigation').removeAttr('readonly');
+                $('#vuln-modal-mitigation').removeClass('form-control-plaintext');
+                $('#vuln-modal-mitigation').addClass('form-control');
+                $('#vuln-modal-form-mitigation button').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
+        case 'ticket':
+            if ($('#vuln-modal-edit-ticket-'+num).is('[readonly]')) {
+                $('#vuln-modal-edit-ticket-'+num).removeAttr('readonly');
+                $('#vuln-modal-edit-ticket-'+num).removeClass('form-control-plaintext');
+                $('#vuln-modal-edit-ticket-'+num).addClass('form-control');
+                $('#vuln-modal-edit-ticket-'+num+'-submit').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
     }
     hideAlerts();
 }
 
 function showModalDelete(btnID, num) {
+    hideAlerts();
     switch(btnID) {
         case 'cve':
             var cve = $('#vuln-modal-edit-cve-'+num).attr('data-original');
-            $('#vuln-modal-alert-warning-item').text('Delete '+cve+'?');
+            $('#vuln-modal-alert-warning-item').text('Delete '+cve+'?  ');
             $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("cve", "yes", "'+cve+'", "'+num+'")');
             $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("cve", "no", "'+cve+'", "'+num+'")');
+            $('#vuln-modal-alert-warning').show();
+            break;
+        case 'ticket':
+            var ticket = $('#vuln-modal-edit-ticket-'+num).attr('data-original');
+            $('#vuln-modal-alert-warning-item').text('Delete '+ticket+'?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("ticket", "yes", "'+ticket+'", "'+num+'")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("ticket", "no", "'+ticket+'", "'+num+'")');
             $('#vuln-modal-alert-warning').show();
             break;
     }
@@ -137,6 +179,27 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                         hideModalEdit();
                         $('#vuln-modal-alert-success').show();
                         $('#vuln-modal-div-cve-'+itemID).hide();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                    }
+                });
+            }
+            $('#vuln-modal-alert-warning-item').text('');
+            $('#vuln-modal-alert-warning').hide();
+            $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
+            $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
+            break;
+        case 'ticket':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method : 'DELETE',
+                    url    : '/vulnerability/'+vid+'/ticket/'+item,
+                    success: function(data) {
+                        hideModalEdit();
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal-div-ticket-'+itemID).hide();
                     },
                     error: function() {
                         $('#vuln-modal-alert-danger').show();
@@ -176,6 +239,31 @@ function appendCve(cve, num) {
     });
 }
 
+function appendTicket(ticket, num) {
+    $('#vuln-modal-ticket-list').append('<div class="row justify-content-start" id="vuln-modal-div-ticket-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-ticket" id="vuln-modal-edit-ticket-' + num + '-btn" data-edit-btn-group="ticket" onclick="showModalEdit(\'ticket\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-ticket" id="vuln-modal-delete-ticket-' + num + '-btn" data-delete-btn-group="ticket" onclick="showModalDelete(\'ticket\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-ticket-'+num+'"> <input type="text" class="form-control-plaintext edit-ticket-input" readonly id="vuln-modal-edit-ticket-' + num + '"value="' + ticket + '" name="ticket" data-original="'+ticket+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-ticket-'+num+'-submit">Submit</button></form></div></div>');
+    $('#vuln-modal-form-ticket-'+num).on('submit', {ticketid: num}, function(event) {
+        event.preventDefault();
+        var ticketid = event.data.ticketid;
+        var fdata = $('#vuln-modal-edit-ticket-'+ticketid).serialize();
+        var vid = $('#vuln-modal-vulnid').text();
+        var ticketString = $('#vuln-modal-edit-ticket-'+ticketid).attr('data-original');
+        $.ajax({
+            method : 'POST',
+            url    : '/vulnerability/'+vid+'/ticket/'+ticketString,
+            data   : fdata,
+            success: function(data) {
+                hideModalEdit();
+                $('#vuln-modal-alert-success').show();
+                $('#vuln-modal-edit-ticket-'+ticketid+'-submit').hide();
+                $('#vuln-modal-edit-ticket-'+ticketid+'-btn').show();
+            },
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+        });
+    });
+}
+
 function updateVulnModal(vuln, modal) {
     modal.find('.modal-title').text(vuln.Name);
     modal.find('#vuln-modal-vulnid').text(vuln.ID);
@@ -203,7 +291,7 @@ function updateVulnModal(vuln, modal) {
     // Test
     modal.find('#vuln-modal-test').val(vuln.Test);
     // Mitigation
-    modal.find('#vuln-modal-mitigation').text(vuln.Mitigation);
+    modal.find('#vuln-modal-mitigation').val(vuln.Mitigation);
     // Initiated
     modal.find('#vuln-modal-initiated').text(vuln.Dates.Initiated);
     // Mitigated
@@ -213,11 +301,11 @@ function updateVulnModal(vuln, modal) {
         modal.find('#vuln-modal-mitigated').text(vuln.Dates.Mitigated);
     }
     // Tickets
-    modal.find('#vuln-modal-tickets-list').empty();
+    modal.find('#vuln-modal-ticket-list').empty();
     if (vuln.Tickets != null) {
         vuln.Tickets.sort();
         for (i = 0; i < vuln.Tickets.length; i++) {
-            modal.find('#vuln-modal-tickets-list').append('<div class="col-1"> <button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-tickets" id="vuln-modal-edit-ticket-' + i + '-btn" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> </div> <div class="col-11"> <p id="vuln-modal-edit-ticket-' + i + '">' + vuln.Tickets[i]  + '</p></div>');
+            appendTicket(vuln.Tickets[i], i);
         }
     }
     // References
@@ -315,9 +403,9 @@ $('#vuln-modal-section-mitigation').hover(function() {
 );
 
 $('#vuln-modal-section-tickets').hover(function() {
-        $('.vme-btn-tickets').show();
+        $('.vme-btn-ticket').show();
     }, function() {
-        $('.vme-btn-tickets').hide();
+        $('.vme-btn-ticket').hide();
     }
 );
 
@@ -437,6 +525,45 @@ $(document).ready(function() {
 			success: function(data) {
                 hideModalEdit();
 				$('#vuln-modal-alert-success').show();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+		});
+	});
+	$('#vuln-modal-form-mitigation').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-mitigation').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		var mitigation = $('#vuln-modal-mitigation').val();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/mitigation',
+			data   : fdata,
+			success: function(data) {
+                hideModalEdit();
+				$('#vuln-modal-alert-success').show();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+            }
+		});
+	});
+	$('#vuln-modal-form-add-ticket').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-add-ticket').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		var ticket = $('#vuln-modal-add-ticket-text').val();
+		$.ajax({
+			method : 'PUT',
+			url    : '/vulnerability/'+vid+'/ticket',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-div-add-ticket').hide();
+				$('#vuln-modal-alert-success').show();
+                var ticketID = $('#vuln-modal-ticket-list').children().length - 1;
+                appendTicket(ticket, ticketID);
+                hideModalEdit();
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

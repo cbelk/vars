@@ -147,6 +147,33 @@ func AddNote(db *sql.DB, vid, eid int64, note string) error {
 	return nil
 }
 
+// AddTicket adds the given ticket to the ticket table for vulnid
+func AddTicket(db *sql.DB, vid int64, ticket string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.InsertTicket(tx, vid, ticket)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // AddSystem adds a new system to the database.
 func AddSystem(db *sql.DB, sys *vars.System) error {
 	//Start transaction and set rollback function
@@ -415,6 +442,33 @@ func DeleteNote(db *sql.DB, nid int64) error {
 
 	// Delete the note (nid)
 	err = vars.DeleteNote(tx, nid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// DeleteTicket will delete the row (vulnid, ticket).
+func DeleteTicket(db *sql.DB, vid int64, ticket string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.DeleteTicket(tx, vid, ticket)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -910,6 +964,32 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// UpdateVulnerabilityMitigation will update the mitigation associated with the given vulnid.
+func UpdateVulnerabilityMitigation(db *sql.DB, vid int64, mitigation string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateMitigation(tx, vid, mitigation)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateVulnerabilitySummary updates the summary associated with the given vulnid.
 func UpdateVulnerabilitySummary(db *sql.DB, vid int64, summary string) error {
 	// Start transaction and set rollback function
@@ -1244,6 +1324,32 @@ func UpdateReferences(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
 		if !vars.IsNilErr(err) {
 			return err
 		}
+	}
+	return nil
+}
+
+// UpdateTicket will update the ticket associated with the row (vid, ticket).
+func UpdateTicket(db *sql.DB, vid int64, oldticket, newticket string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateTicket(tx, vid, oldticket, newticket)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
 	}
 	return nil
 }
