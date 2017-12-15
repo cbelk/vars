@@ -24,6 +24,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -87,6 +88,7 @@ func main() {
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
+	router.DELETE("/vulnerability/:vuln/:field", handleVulnerabilityDelete)
 	router.POST("/vulnerability/:vuln/:field/:item", handleVulnerabilityPost)
 	router.DELETE("/vulnerability/:vuln/:field/:item", handleVulnerabilityDelete)
 
@@ -298,6 +300,20 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "ref":
+			if user.Emp.Level <= StandardUser {
+				ref := r.FormValue("ref")
+				err := varsapi.AddRef(db, int64(vid), ref)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			w.WriteHeader(http.StatusTeapot)
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -341,6 +357,25 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "ref":
+			if user.Emp.Level <= StandardUser {
+				b, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				ref := string(b)
+				err = varsapi.DeleteRef(db, int64(vid), ref)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			w.WriteHeader(http.StatusTeapot)
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -457,6 +492,21 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "ref":
+			if user.Emp.Level <= StandardUser {
+				oldRef := r.FormValue("oldr")
+				newRef := r.FormValue("newr")
+				err := varsapi.UpdateReference(db, int64(vid), oldRef, newRef)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			w.WriteHeader(http.StatusTeapot)
 		}
 	}
 }

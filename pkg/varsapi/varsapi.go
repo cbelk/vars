@@ -147,6 +147,33 @@ func AddNote(db *sql.DB, vid, eid int64, note string) error {
 	return nil
 }
 
+// AddRef adds the given reference to the ref table for vulnid.
+func AddRef(db *sql.DB, vid int64, ref string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.InsertRef(tx, vid, ref)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // AddTicket adds the given ticket to the ticket table for vulnid
 func AddTicket(db *sql.DB, vid int64, ticket string) error {
 	//Start transaction and set rollback function
@@ -442,6 +469,33 @@ func DeleteNote(db *sql.DB, nid int64) error {
 
 	// Delete the note (nid)
 	err = vars.DeleteNote(tx, nid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// DeleteRef will delete the row in the ref table associated with (vid, ref).
+func DeleteRef(db *sql.DB, vid int64, ref string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.DeleteRef(tx, vid, ref)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -1305,6 +1359,32 @@ func UpdateCves(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
 		if !vars.IsNilErr(err) {
 			return err
 		}
+	}
+	return nil
+}
+
+// UpdateReference will update the reference associated with row (vid, oldRef) to newRef.
+func UpdateReference(db *sql.DB, vid int64, oldRef, newRef string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateRefers(tx, vid, oldRef, newRef)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
 	}
 	return nil
 }
