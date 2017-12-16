@@ -46,6 +46,9 @@ function hideModalEdit() {
     $('#vuln-modal-mitigation').attr('readonly', true);
     $('#vuln-modal-mitigation').addClass('form-control-plaintext');
     $('#vuln-modal-mitigation').removeClass('form-control');
+    $('#vuln-modal-exploit').attr('readonly', true);
+    $('#vuln-modal-exploit').addClass('form-control-plaintext');
+    $('#vuln-modal-exploit').removeClass('form-control');
     $('#vuln-modal-exploitable').attr('disabled', true);
     $('.edit-cve-input').attr('readonly', true);
     $('.edit-cve-input').addClass('form-control-plaintext');
@@ -147,6 +150,16 @@ function showModalEdit(btnID, num) {
             if ($('#vuln-modal-exploitable').is('[disabled]')) {
                 $('#vuln-modal-exploitable').attr('disabled', false);
                 $('#vuln-modal-form-exploitable button').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
+        case 'vuln-modal-edit-exploit':
+            if ($('#vuln-modal-exploit').is('[readonly]')) {
+                $('#vuln-modal-exploit').removeAttr('readonly');
+                $('#vuln-modal-exploit').removeClass('form-control-plaintext');
+                $('#vuln-modal-exploit').addClass('form-control');
+                $('#vuln-modal-form-exploit button').show();
             } else {
                 hideModalEdit();
             }
@@ -420,11 +433,11 @@ function updateVulnModal(vuln, modal) {
         modal.find('#vuln-modal-exploitable option[value="false"]').removeAttr('selected');
         modal.find('#vuln-modal-exploitable option[value="true"]').attr('selected', true);
     }
-    // Exploits
+    // Exploit
     if (vuln.Exploit == null) {
-        modal.find('#vuln-modal-exploit').text('');
+        modal.find('#vuln-modal-exploit').val('');
     } else {
-        modal.find('#vuln-modal-exploit').text(vuln.Exploit);
+        modal.find('#vuln-modal-exploit').val(vuln.Exploit);
     }
     // Affected
     modal.find('#vuln-modal-affected-table').empty();
@@ -720,6 +733,27 @@ $(document).ready(function() {
 			success: function(data) {
 				$('#vuln-modal-alert-success').show();
                 $('#vuln-modal').scrollTop(0);
+                hideModalEdit();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#vuln-modal-form-exploit').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-exploit').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/exploit',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
+                $('#vuln-modal-exploitable option[value="false"]').removeAttr('selected');
+                $('#vuln-modal-exploitable option[value="true"]').attr('selected', true);
                 hideModalEdit();
 			},
             error: function() {

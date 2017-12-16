@@ -915,6 +915,40 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	return nil
 }
 
+// UpdateExploit will update the exploit associated with vulnid.
+func UpdateExploit(db *sql.DB, vid int64, exploit string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateExploit(tx, vid, exploit)
+	if !vars.IsNilErr(err) {
+		if vars.IsNoRowsError(err) {
+			err = vars.InsertExploit(tx, vid, true, exploit)
+			if !vars.IsNilErr(err) {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateExploitable will update the exploitable boolean associated with vulnid.
 func UpdateExploitable(db *sql.DB, vid int64, exploitable bool) error {
 	// Start transaction and set rollback function
