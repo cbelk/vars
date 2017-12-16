@@ -505,6 +505,22 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "exploitable":
+			if user.Emp.Level <= StandardUser {
+				exploitable := r.FormValue("exploitable")
+				b, err := strconv.ParseBool(exploitable)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = varsapi.UpdateExploitable(db, int64(vid), b)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
 		}

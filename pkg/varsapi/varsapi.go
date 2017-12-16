@@ -915,6 +915,40 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 	return nil
 }
 
+// UpdateExploitable will update the exploitable boolean associated with vulnid.
+func UpdateExploitable(db *sql.DB, vid int64, exploitable bool) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateExploitable(tx, vid, exploitable)
+	if !vars.IsNilErr(err) {
+		if vars.IsNoRowsError(err) {
+			err = vars.InsertExploit(tx, vid, exploitable, "")
+			if !vars.IsNilErr(err) {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateNote will update the note with the given noteid.
 func UpdateNote(db *sql.DB, noteid int64, note string) error {
 	// Start transaction and set rollback function

@@ -46,6 +46,7 @@ function hideModalEdit() {
     $('#vuln-modal-mitigation').attr('readonly', true);
     $('#vuln-modal-mitigation').addClass('form-control-plaintext');
     $('#vuln-modal-mitigation').removeClass('form-control');
+    $('#vuln-modal-exploitable').attr('disabled', true);
     $('.edit-cve-input').attr('readonly', true);
     $('.edit-cve-input').addClass('form-control-plaintext');
     $('.edit-cve-input').removeClass('form-control');
@@ -138,6 +139,14 @@ function showModalEdit(btnID, num) {
                 $('#vuln-modal-mitigation').removeClass('form-control-plaintext');
                 $('#vuln-modal-mitigation').addClass('form-control');
                 $('#vuln-modal-form-mitigation button').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
+        case 'vuln-modal-edit-exploitable':
+            if ($('#vuln-modal-exploitable').is('[disabled]')) {
+                $('#vuln-modal-exploitable').attr('disabled', false);
+                $('#vuln-modal-form-exploitable button').show();
             } else {
                 hideModalEdit();
             }
@@ -403,16 +412,21 @@ function updateVulnModal(vuln, modal) {
             appendRef(vuln.References[i], i);
         }
     }
-    if (vuln.Exploitable == null) {
-        modal.find('#vuln-modal-exploitable').text('false');
+    // Exploitable
+    if (vuln.Exploitable == null || vuln.Exploitable == false) {
+        modal.find('#vuln-modal-exploitable option[value="true"]').removeAttr('selected');
+        modal.find('#vuln-modal-exploitable option[value="false"]').attr('selected', true);
     } else {
-        modal.find('#vuln-modal-exploitable').text(vuln.Exploitable);
+        modal.find('#vuln-modal-exploitable option[value="false"]').removeAttr('selected');
+        modal.find('#vuln-modal-exploitable option[value="true"]').attr('selected', true);
     }
+    // Exploits
     if (vuln.Exploit == null) {
         modal.find('#vuln-modal-exploit').text('');
     } else {
         modal.find('#vuln-modal-exploit').text(vuln.Exploit);
     }
+    // Affected
     modal.find('#vuln-modal-affected-table').empty();
     for (i = 0; i < vuln.AffSystems.length; i++) {
         modal.find('#vuln-modal-affected-table').append('<tr><td>' + vuln.AffSystems[i].Sys.Name + '</td><td>' + vuln.AffSystems[i].Sys.Description + '</td><td>'+ vuln.AffSystems[i].Sys.Location + '</td><td>'+ vuln.AffSystems[i].Sys.State + '</td><td>'+ vuln.AffSystems[i].Mitigated + '</td></li>')
@@ -687,6 +701,25 @@ $(document).ready(function() {
                 $('#vuln-modal').scrollTop(0);
                 var refID = $('#vuln-modal-ref-list').children().length - 1;
                 appendRef(ref, refID);
+                hideModalEdit();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#vuln-modal-form-exploitable').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-exploitable').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/exploitable',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
                 hideModalEdit();
 			},
             error: function() {
