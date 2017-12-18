@@ -18,21 +18,20 @@
 //                                                                                  //
 //////////////////////////////////////////////////////////////////////////////////////
 
-//function deleteSubmitHandlers() {
-//    $('.submit-cve').off('submit');
-//}
-
 function hideAlerts() {
     $('#vuln-modal-alert-success').hide();
     $('#vuln-modal-alert-danger').hide();
     $('#vuln-modal-alert-warning').hide();
     $('#vuln-modal-alert-warning-item').text('');
+    $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
+    $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
 }
 
 function hideModalEdit() {
     $('#vuln-modal-div-add-cve').hide();
     $('#vuln-modal-div-add-ticket').hide();
     $('#vuln-modal-div-add-ref').hide();
+    $('#vuln-modal-div-add-affected').hide();
     $('#vuln-modal-div-edit-cvss').hide();
     $('#vuln-modal-corpscore').attr('readonly', true);
     $('#vuln-modal-corpscore').addClass('form-control-plaintext');
@@ -81,6 +80,31 @@ function handleModalAddItem(btnID) {
                 $('#vuln-modal-div-add-ref').show();
             } else {
                 $('#vuln-modal-div-add-ref').hide();
+            }
+            break;
+        case 'vuln-modal-add-affected':
+            if ($('#vuln-modal-div-add-affected').is(':hidden')) {
+                if ($('#vme-add-affected-list option').length == 0) {
+                    // load options
+                    $.ajax({
+                        method   : 'GET',
+                        dataType : 'json',
+                        url      : '/systems/active',
+                        success: function(data) {
+                            $('#vme-add-affected-list').append('<option selected>Select a system</option>');
+                            for (i=0; i < data.length; i++) {
+                                $('#vme-add-affected-list').append('<option data-sys-desc="'+data[i].Description+'" data-sys-loc="'+data[i].Location+'" value="'+data[i].ID+'">'+data[i].Name+'</option>');
+                            }
+                        },
+                        error: function() {
+                            $('#vuln-modal-alert-danger').show();
+                            $('#vuln-modal').scrollTop(0);
+                        }
+                    });
+                }
+                $('#vuln-modal-div-add-affected').show();
+            } else {
+                $('#vuln-modal-div-add-affected').hide();
             }
             break;
     }
@@ -187,6 +211,37 @@ function showModalEdit(btnID, num) {
     hideAlerts();
 }
 
+function handleAffectedAction(id, name, action) {
+    hideAlerts();
+    switch(action) {
+        case 'delete':
+            $('#vuln-modal-alert-warning-item').text('Delete '+name+' from the list of affected systems?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("affected","yes", "'+id+'")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("affected","not", "'+id+'")');
+            $('#vuln-modal-alert-warning').show();
+            $('#vuln-modal').scrollTop(0);
+            break;
+        case 'check':
+            $('#vuln-modal-alert-warning-item').text('Mark '+name+' as patched?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("affected","patched", true, "'+id+'")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("affected","no", "'+id+'")');
+            $('#vuln-modal-alert-warning').show();
+            $('#vuln-modal').scrollTop(0);
+            $('#vme-affected-'+id+' input').attr('checked', true);
+            $('#vme-affected-'+id+' input').prop('checked', true);
+            break;
+        case 'uncheck':
+            $('#vuln-modal-alert-warning-item').text('Mark '+name+' as un-patched?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("affected","patched", false, "'+id+'")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("affected","no", "'+id+'")');
+            $('#vuln-modal-alert-warning').show();
+            $('#vuln-modal').scrollTop(0);
+            $('#vme-affected-'+id+' input').removeAttr('checked');
+            $('#vme-affected-'+id+' input').prop('checked', false);
+            break;
+    }
+}
+
 function showModalDelete(btnID, num) {
     hideAlerts();
     switch(btnID) {
@@ -235,10 +290,6 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                     }
                 });
             }
-            $('#vuln-modal-alert-warning-item').text('');
-            $('#vuln-modal-alert-warning').hide();
-            $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
-            $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
             break;
         case 'ticket':
             if (choice == 'yes') {
@@ -258,10 +309,6 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                     }
                 });
             }
-            $('#vuln-modal-alert-warning-item').text('');
-            $('#vuln-modal-alert-warning').hide();
-            $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
-            $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
             break;
         case 'ref':
             if (choice == 'yes') {
@@ -283,12 +330,66 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                     }
                 });
             }
-            $('#vuln-modal-alert-warning-item').text('');
-            $('#vuln-modal-alert-warning').hide();
-            $('#vuln-modal-warning-yes').attr('onclick', 'placeholder()');
-            $('#vuln-modal-warning-no').attr('onclick', 'placeholder()');
+            break;
+        case 'affected':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method      : 'DELETE',
+                    url         : '/vulnerability/'+vid+'/affected/'+item,
+                    success: function(data) {
+                        hideModalEdit();
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal').scrollTop(0);
+                        $('#vme-affected-'+item).remove();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                    }
+                });
+            } else if (choice == 'no') {
+                if ($('#vme-affected-'+item+' input').is('[checked]')) {
+                    $('#vme-affected-'+item+' input').removeAttr('checked');
+                    $('#vme-affected-'+item+' input').prop('checked', false);
+                } else {
+                    $('#vme-affected-'+item+' input').attr('checked', true);
+                    $('#vme-affected-'+item+' input').prop('checked', true);
+                }
+            } else if (choice == 'patched') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method      : 'POST',
+                    url         : '/vulnerability/'+vid+'/affected/'+itemID,
+                    data        : {patched: item},
+                    success: function(data) {
+                        hideModalEdit();
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal').scrollTop(0);
+                        if ($('#vme-affected-'+itemID+' input').is('[checked]')) {
+                            $('#vme-affected-'+itemID+' input').attr('checked', true);
+                            $('#vme-affected-'+itemID+' input').prop('checked', true);
+                        } else {
+                            $('#vme-affected-'+itemID+' input').removeAttr('checked');
+                            $('#vme-affected-'+itemID+' input').prop('checked', false);
+                        }
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                        if ($('#vme-affected-'+itemID+' input').is('[checked]')) {
+                            $('#vme-affected-'+itemID+' input').removeAttr('checked');
+                            $('#vme-affected-'+itemID+' input').prop('checked', false);
+                        } else {
+                            $('#vme-affected-'+itemID+' input').attr('checked', true);
+                            $('#vme-affected-'+itemID+' input').prop('checked', true);
+                        }
+                    }
+                });
+            }
             break;
     }
+    hideAlerts();
 }
 
 function appendCve(cve, num) {
@@ -441,8 +542,23 @@ function updateVulnModal(vuln, modal) {
     }
     // Affected
     modal.find('#vuln-modal-affected-table').empty();
+    modal.find('#vme-add-affected-list').empty();
     for (i = 0; i < vuln.AffSystems.length; i++) {
-        modal.find('#vuln-modal-affected-table').append('<tr><td>' + vuln.AffSystems[i].Sys.Name + '</td><td>' + vuln.AffSystems[i].Sys.Description + '</td><td>'+ vuln.AffSystems[i].Sys.Location + '</td><td>'+ vuln.AffSystems[i].Sys.State + '</td><td>'+ vuln.AffSystems[i].Mitigated + '</td></li>')
+        modal.find('#vuln-modal-affected-table').append('<tr id="vme-affected-'+vuln.AffSystems[i].Sys.ID+'"><td><button type="button" class="btn-sm bg-white text-danger border-0" onclick="handleAffectedAction('+vuln.AffSystems[i].Sys.ID+', \''+vuln.AffSystems[i].Sys.Name+'\', \'delete\')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></td><td>' + vuln.AffSystems[i].Sys.Name + '</td><td>' + vuln.AffSystems[i].Sys.Description + '</td><td>'+ vuln.AffSystems[i].Sys.Location + '</td><td>'+ vuln.AffSystems[i].Sys.State + '</td><td><label class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input"><span class="custom-control-indicator"></span></label></td></tr>');
+        if (vuln.AffSystems[i].Mitigated) {
+            $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').attr('checked', true);
+            $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').prop('checked', true);
+        }
+        $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').data('sid', vuln.AffSystems[i].Sys.ID);
+        $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').change(function() {
+            var sid = $(this).data('sid');
+            var name = $('#vme-affected-'+sid).find('td:eq(1)').text();
+            if ($(this).is('[checked]')) {
+                handleAffectedAction(sid, name, 'uncheck');
+            } else {
+                handleAffectedAction(sid, name, 'check');
+            }
+        });
     }
 }
 
@@ -755,6 +871,40 @@ $(document).ready(function() {
                 $('#vuln-modal-exploitable option[value="false"]').removeAttr('selected');
                 $('#vuln-modal-exploitable option[value="true"]').attr('selected', true);
                 hideModalEdit();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#vuln-modal-form-add-affected').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-add-affected').serialize();
+		var vid   = $('#vuln-modal-vulnid').text();
+        var sid   = $('#vme-add-affected-list').find(':selected').val();
+        var sname = $('#vme-add-affected-list').find(':selected').text();
+        var desc  = $('#vme-add-affected-list').find(':selected').attr('data-sys-desc');
+        var loc   = $('#vme-add-affected-list').find(':selected').attr('data-sys-loc');
+		$.ajax({
+			method : 'PUT',
+			url    : '/vulnerability/'+vid+'/affected',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-div-add-affected').hide();
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
+                $('#vuln-modal-affected-table').append('<tr id="vme-affected-'+sid+'"><td><button type="button" class="btn-sm bg-white text-danger border-0" onclick="handleAffectedAction('+sid+', \''+sname+'\', \'delete\')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></td><td>'+sname+'</td><td>'+desc+'</td><td>'+loc+ '</td><td>active</td><td><label class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input"><span class="custom-control-indicator"></span></label></td></tr>');
+                $('#vme-affected-'+sid+' input').data('sid', sid);
+                $('#vme-affected-'+sid+' input').change(function() {
+                    var sid = $(this).data('sid');
+                    var name = $('#vme-affected-'+sid).find('td:eq(1)').text();
+                    if ($(this).is('[checked]')) {
+                        handleAffectedAction(sid, name, 'uncheck');
+                    } else {
+                        handleAffectedAction(sid, name, 'check');
+                    }
+                });
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

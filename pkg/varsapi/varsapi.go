@@ -30,7 +30,7 @@ import (
 )
 
 // AddAffected adds a new vulnerability/system pair to the affected table
-func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
+func AddAffected(db *sql.DB, vid, sid int64) error {
 	//Start transaction and set rollback function
 	tx, err := db.Begin()
 	if err != nil {
@@ -44,7 +44,7 @@ func AddAffected(db *sql.DB, vuln *vars.Vulnerability, sys *vars.System) error {
 	}()
 
 	// Add affected
-	err = vars.InsertAffected(tx, vuln.ID, sys.ID, false)
+	err = vars.InsertAffected(tx, vid, sid, false)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -533,6 +533,11 @@ func DeleteTicket(db *sql.DB, vid int64, ticket string) error {
 		return e
 	}
 	return nil
+}
+
+// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
+func GetActiveSystems() ([]*vars.System, error) {
+	return vars.GetActiveSystems()
 }
 
 // GetEmployeeByID returns an Employee object with the given empid.

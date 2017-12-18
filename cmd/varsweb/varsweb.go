@@ -85,6 +85,7 @@ func main() {
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
+	router.GET("/systems/:sys", handleSystems)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
@@ -187,6 +188,41 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
+func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	s := ps.ByName("sys")
+	if user.Authed {
+		if user.Emp.Level <= StandardUser {
+			switch s {
+			case "all":
+			case "active":
+				syss, err := varsapi.GetActiveSystems()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = json.NewEncoder(w).Encode(syss)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			case "deactivated":
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
 // handleVulnerabilities serves the vulnerability pages
 func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user, err := getSession(r)
@@ -238,18 +274,18 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 			} else {
 				vid, err := strconv.Atoi(v)
 				if err != nil {
-					err = templates.Lookup("page-not-exist").Execute(w, user)
-					if err != nil {
-						http.Error(w, "Error with templating", http.StatusInternalServerError)
-					}
+					w.WriteHeader(http.StatusNotFound)
+					return
 				}
 				vuln, err := varsapi.GetVulnerability(int64(vid))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = json.NewEncoder(w).Encode(vuln)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 			}
 		} else {
@@ -282,9 +318,9 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				err := varsapi.AddCve(db, int64(vid), cve)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-				} else {
-					w.WriteHeader(http.StatusOK)
+					return
 				}
+				w.WriteHeader(http.StatusOK)
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
@@ -294,9 +330,9 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				err := varsapi.AddTicket(db, int64(vid), ticket)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-				} else {
-					w.WriteHeader(http.StatusOK)
+					return
 				}
+				w.WriteHeader(http.StatusOK)
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
@@ -306,9 +342,26 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				err := varsapi.AddRef(db, int64(vid), ref)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-				} else {
-					w.WriteHeader(http.StatusOK)
+					return
 				}
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "affected":
+			if user.Emp.Level <= StandardUser {
+				sys := r.FormValue("system")
+				sid, err := strconv.Atoi(sys)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				err = varsapi.AddAffected(db, int64(vid), int64(sid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
@@ -371,6 +424,23 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 					return
 				}
 				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "affected":
+			if user.Emp.Level <= StandardUser {
+				sys := ps.ByName("item")
+				sid, err := strconv.Atoi(sys)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				err = varsapi.DeleteAffected(db, int64(vid), int64(sid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
@@ -525,6 +595,28 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			if user.Emp.Level <= StandardUser {
 				exploit := r.FormValue("exploit")
 				err = varsapi.UpdateExploit(db, int64(vid), exploit)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "affected":
+			if user.Emp.Level <= StandardUser {
+				sys := ps.ByName("item")
+				sid, err := strconv.Atoi(sys)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				patched := r.FormValue("patched")
+				b, err := strconv.ParseBool(patched)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = varsapi.UpdateAffected(db, int64(vid), int64(sid), b)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				} else {
