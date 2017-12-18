@@ -587,6 +587,11 @@ func GetConfig() vars.Config {
 	return vars.Conf
 }
 
+// GetNoteAuthor returns the empid of the author of the note.
+func GetNoteAuthor(noteid int64) (int64, error) {
+	return vars.GetNoteAuthor(noteid)
+}
+
 // GetNotes retrieves/returns a slice of pointers to all note objects for the given vulnid.
 func GetNotes(vid int64) ([]*vars.Note, error) {
 	return vars.GetNotes(vid)
@@ -786,6 +791,11 @@ func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
 		return &v, err
 	}
 	return GetVulnerability(id)
+}
+
+// IsNoRowsError returns true if the error is caused by no rows being effected
+func IsNoRowsError(err error) bool {
+	return vars.IsNoRowsError(err)
 }
 
 // ReadConfig passes the config string to vars.ReadConfig to create the Config object.

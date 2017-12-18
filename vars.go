@@ -46,6 +46,7 @@ const (
 	ssGetEmpID
 	ssGetExploit
 	ssGetImpact
+	ssGetNoteEmp
 	ssGetNotes
 	ssGetOpenVulnIDs
 	ssGetReferences
@@ -120,6 +121,7 @@ var (
 		ssGetEmps:           "SELECT empid, firstname, lastname, email, username, level FROM emp;",
 		ssGetExploit:        "SELECT exploitable, exploit FROM exploits WHERE vulnid=$1;",
 		ssGetImpact:         "SELECT cvss, cvsslink, corpscore FROM impact WHERE vulnid=$1;",
+		ssGetNoteEmp:        "SELECT empid FROM notes WHERE noteid=$1;",
 		ssGetNotes:          "SELECT noteid, empid, added, note FROM notes WHERE vulnid=$1 ORDER BY added ASC;",
 		ssGetOpenVulnIDs:    "SELECT vulnid FROM dates WHERE mitigated IS NULL;",
 		ssGetReferences:     "SELECT url FROM ref WHERE vulnid=$1;",
@@ -188,6 +190,7 @@ var (
 		ssGetExploit:        "GetExploit",
 		ssGetClosedVulnIDs:  "GetClosedVulnIDs",
 		ssGetImpact:         "GetImpact",
+		ssGetNoteEmp:        "GetNoteAuthor",
 		ssGetNotes:          "GetNotes",
 		ssGetOpenVulnIDs:    "GetOpenVulnIDs",
 		ssGetReferences:     "GetReferences",
@@ -458,6 +461,16 @@ func GetImpact(vid int64) (float32, VarsNullString, float32, error) {
 // GetOpenVulnIDs returns a pointer to a slice of vulnerability IDs that do not have a mitigated date.
 func GetOpenVulnIDs() (*[]int64, error) {
 	return execGetRowsInt(ssGetOpenVulnIDs)
+}
+
+// GetNoteAuthor returns the empid of the author of the note.
+func GetNoteAuthor(noteid int64) (int64, error) {
+	var empid int64
+	err := queries[ssGetNoteEmp].QueryRow(noteid).Scan(&empid)
+	if !IsNilErr(err) {
+		return empid, newErrFromErr(err, execNames[ssGetNoteEmp])
+	}
+	return empid, nil
 }
 
 // GetNotes returns a slice of pointers to note objects.

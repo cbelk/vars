@@ -85,6 +85,8 @@ func main() {
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
+	router.GET("/notes/:vuln", handleNotes)
+	router.POST("/notes/:noteid", handleNotesPost)
 	router.GET("/systems/:sys", handleSystems)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
@@ -186,6 +188,96 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if user.Authed {
+		if user.Emp.Level <= StandardUser {
+			v := ps.ByName("vuln")
+			vid, err := strconv.Atoi(v)
+			if err != nil {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			ns, err := varsapi.GetNotes(int64(vid))
+			if err != nil {
+				if varsapi.IsNoRowsError(err) {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			var notes []interface{}
+			for _, n := range ns {
+				canEdit := user.Emp.ID == n.EmpID
+				employee, err := varsapi.GetEmployeeByID(n.EmpID)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				note := struct {
+					Nid      int64
+					Emp      string
+					Added    string
+					Note     string
+					Editable bool
+				}{n.ID, fmt.Sprintf("%v %v", employee.FirstName, employee.LastName), n.Added.Format("Mon, 02 Jan 2006 15:04:05"), n.Note, canEdit}
+				notes = append(notes, note)
+			}
+			err = json.NewEncoder(w).Encode(notes)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if user.Authed {
+		n := ps.ByName("noteid")
+		nid, err := strconv.Atoi(n)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		author, err := varsapi.GetNoteAuthor(int64(nid))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if user.Emp.Level <= StandardUser && user.Emp.ID == author {
+			note := r.FormValue("note")
+			err = varsapi.UpdateNote(db, int64(nid), note)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
 }
 
 func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -373,6 +465,18 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "note":
+			if user.Emp.Level <= StandardUser {
+				note := r.FormValue("note")
+				err := varsapi.AddNote(db, int64(vid), user.Emp.ID, note)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
 		}
@@ -449,6 +553,28 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "note":
+			n := ps.ByName("item")
+			nid, err := strconv.Atoi(n)
+			if err != nil {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			author, err := varsapi.GetNoteAuthor(int64(nid))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if user.Emp.Level <= StandardUser && user.Emp.ID == author {
+				err = varsapi.DeleteNote(db, int64(nid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
