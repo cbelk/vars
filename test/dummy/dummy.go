@@ -121,7 +121,7 @@ func main() {
 					log.Fatal(err)
 				}
 				v.ID = vid
-				err = varsapi.AddAffected(db, &v, &s)
+				err = varsapi.AddAffected(db, v.ID, s.ID)
 				if !vars.IsNilErr(err) {
 					log.Fatal(err)
 				}
@@ -131,6 +131,50 @@ func main() {
 				}
 			}
 		}
+	}
+
+	// Add note to DirtyCOW
+	fmt.Printf("Adding note to %v ...\n", vulns[0].Name)
+	vid, err := vars.GetVulnID(vulns[0].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	emp, err := varsapi.GetEmployeeByUsername(emps[3].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note := "They just discovered a vulnerability in the patch!!"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add note to Cortana
+	fmt.Printf("Adding note to %v ...\n", vulns[1].Name)
+	vid, err = vars.GetVulnID(vulns[1].Name)
+	if !vars.IsNilErr(err) {
+		log.Fatal(err)
+	}
+	emp, err = varsapi.GetEmployeeByUsername(emps[0].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note = "Maybe we should just get rid of Windows?"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add another note to Cortana
+	fmt.Printf("Adding note to %v ...\n", vulns[1].Name)
+	emp, err = varsapi.GetEmployeeByUsername(emps[2].UserName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	note = "I agree ^"
+	err = varsapi.AddNote(db, vid, emp.ID, note)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Close some VAs
