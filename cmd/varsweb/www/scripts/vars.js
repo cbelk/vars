@@ -1027,4 +1027,22 @@ $(document).ready(function() {
             }
 		});
 	});
+    // Load vuln table
+    $.ajax({
+        method : 'GET',
+        dataType    : 'json',
+        url    : '/vulnerability/open',
+        success: function(data) {
+            $('#vuln-table').find('th:eq(5)').hide();
+            $('#vuln-table').find('td:eq(5)').hide();
+            if (data != null) {
+                for (i=0; i < data.length; i++) {
+                    $('#vuln-table tbody').append('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data[i].ID+'"><td>'+data[i].Name+'</td><td>'+data[i].Summary+'</td><td>'+data[i].Cvss+'</td><td>'+data[i].CorpScore+'</td><td>'+data[i].Initiated+'</td></tr>');
+                }
+            }
+        },
+        error  : function() {
+            alert('Error loading vulnerabilities');
+        }
+    });
 });
