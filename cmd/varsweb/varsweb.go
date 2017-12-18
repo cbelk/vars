@@ -198,6 +198,15 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 		if user.Emp.Level <= StandardUser {
 			switch s {
 			case "all":
+				syss, err := varsapi.GetSystems()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = json.NewEncoder(w).Encode(syss)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
 			case "active":
 				syss, err := varsapi.GetActiveSystems()
 				if err != nil {
@@ -208,7 +217,6 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-			case "deactivated":
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
