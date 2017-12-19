@@ -31,7 +31,7 @@ type errType int
 const (
 	noRowsInserted errType = iota
 	noRowsUpdated
-	nameNotAvailable
+	NameNotAvailable
 	unknownType
 	genericVars
 )
@@ -55,6 +55,10 @@ type Err struct {
 	err     error
 }
 
+func NewErr(errT errType, parents ...string) Err {
+	return newErr(errT, parents...)
+}
+
 // Creates a new VARS error based on the type
 func newErr(errT errType, parents ...string) Err {
 	err := new(Err)
@@ -64,7 +68,7 @@ func newErr(errT errType, parents ...string) Err {
 		err.err = ErrNoRowsInserted
 	case noRowsUpdated:
 		err.err = ErrNoRowsUpdated
-	case nameNotAvailable:
+	case NameNotAvailable:
 		err.err = ErrNameNotAvailable
 	case unknownType:
 		err.err = ErrUnknownType
@@ -92,6 +96,22 @@ func newErrFromErr(err error, parents ...string) Err {
 // Error impliments the error interface
 func (e Err) Error() string {
 	return fmt.Sprintf("VARS: %s: %s", strings.Join(e.parents, ": "), e.err.Error())
+}
+
+// IsNameNotAvailableError returns true if the error is caused by name not being available
+func (e Err) IsNameNotAvailableError() bool {
+	if e.err == ErrNameNotAvailable {
+		return true
+	}
+	return false
+}
+
+// IsNameNotAvailableError returns true if the error is caused by name not being available
+func IsNameNotAvailableError(err error) bool {
+	if varsErr, ok := err.(Err); ok {
+		return varsErr.IsNameNotAvailableError()
+	}
+	return false
 }
 
 // IsNoRowsError returns true if the error is caused by no rows being effected

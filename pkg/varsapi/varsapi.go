@@ -216,7 +216,7 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	}()
 
 	// Check if system name is available
-	a, err := vars.NameIsAvailable(*sys)
+	a, err := vars.NameIsAvailable("sys", sys.Name)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -251,6 +251,12 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// CreateVulnerability creates a vulnerability object with the given parameters.
+func CreateVulnerability(name, summary, cvssLink, test, mitigation, exploit string, exploitable bool, cvss, corpscore float32) *vars.Vulnerability {
+	vuln := vars.Vulnerability{Name: name, Cvss: cvss, CorpScore: corpscore, CvssLink: GetVarsNullString(cvssLink), Summary: summary, Test: test, Mitigation: mitigation, Exploit: GetVarsNullString(exploit), Exploitable: GetVarsNullBool(exploitable)}
+	return &vuln
+}
+
 // AddVulnerability starts a new VA
 func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	//Start transaction and set rollback function
@@ -266,12 +272,12 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	}()
 
 	// Check if vulnerability name is available
-	a, err := vars.NameIsAvailable(*vuln)
+	a, err := vars.NameIsAvailable("vuln", vuln.Name)
 	if !vars.IsNilErr(err) {
 		return err
 	}
 	if !a {
-		return vars.ErrNameNotAvailable
+		return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "AddVulnerability")
 	}
 
 	// Insert the vulnerability into the database
@@ -654,6 +660,11 @@ func GetVarsNullTime(t time.Time) vars.VarsNullTime {
 	return vars.VarsNullTime{pq.NullTime{Time: t, Valid: true}}
 }
 
+// GetVulnID returns the vulnid associated with the vname.
+func GetVulnID(vname string) (int64, error) {
+	return vars.GetVulnID(vname)
+}
+
 // GetVulnerabilities retrieves/returns all vulnerabilities.
 func GetVulnerabilities() ([]*vars.Vulnerability, error) {
 	// Get vulnerabilities (vuln fields)
@@ -791,6 +802,11 @@ func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
 		return &v, err
 	}
 	return GetVulnerability(id)
+}
+
+// IsNameNotAvailableError returns true if the error is caused by name not being available
+func IsNameNotAvailableError(err error) bool {
+	return vars.IsNameNotAvailableError(err)
 }
 
 // IsNoRowsError returns true if the error is caused by no rows being effected
@@ -1048,7 +1064,7 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 	// Compare old system object to new system object and update appropriate parts
 	if old.Name != sys.Name {
 		// Check new name
-		a, err := vars.NameIsAvailable(*sys)
+		a, err := vars.NameIsAvailable("sys", sys.Name)
 		if !vars.IsNilErr(err) {
 			return err
 		}
@@ -1116,6 +1132,39 @@ func UpdateVulnerabilityMitigation(db *sql.DB, vid int64, mitigation string) err
 	}()
 
 	err = vars.UpdateMitigation(tx, vid, mitigation)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateVulnerabilityName updates the name associated with the given vulnid.
+func UpdateVulnerabilityName(db *sql.DB, vid int64, name string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	a, err := vars.NameIsAvailable("vuln", name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	if !a {
+		return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "UpdateVulnerabilityName")
+	}
+	err = vars.UpdateVulnName(tx, vid, name)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -1212,7 +1261,7 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	// Compare old vulnerability object to new vulnerability object and update appropriate parts
 	if old.Name != vuln.Name {
 		// Check new name
-		a, err := vars.NameIsAvailable(*vuln)
+		a, err := vars.NameIsAvailable("vuln", vuln.Name)
 		if !vars.IsNilErr(err) {
 			return err
 		}

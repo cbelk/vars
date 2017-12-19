@@ -296,8 +296,8 @@ type Vulnerability struct {
 	Cvss        float32        // CVSS score
 	CorpScore   float32        // Calculated corporate score
 	CvssLink    VarsNullString // Link to CVSS scoresheet
-	Finder      int            // Employee that found the vulnerability
-	Initiator   int            // Employee that started the vulnerability assessment
+	Finder      int64          // Employee that found the vulnerability
+	Initiator   int64          // Employee that started the vulnerability assessment
 	Summary     string
 	Test        string // Test to see if system has this vulnerability
 	Mitigation  string
@@ -664,7 +664,7 @@ func InsertTicket(tx *sql.Tx, vid int64, ticket string) Err {
 }
 
 // InsertVulnerability will insert a new row into the vuln table.
-func InsertVulnerability(tx *sql.Tx, vname string, finder, initiator int, summary, test, mitigation string) error {
+func InsertVulnerability(tx *sql.Tx, vname string, finder, initiator int64, summary, test, mitigation string) error {
 	return execMutation(tx, ssInsertVuln, vname, finder, initiator, summary, test, mitigation)
 }
 
@@ -682,19 +682,16 @@ func IsVulnOpen(vid int64) (bool, error) {
 }
 
 // NameIsAvailable returns true if the vulnerability name is available, false otherwise.
-func NameIsAvailable(obj interface{}) (bool, error) {
+func NameIsAvailable(obj, name string) (bool, error) {
 	var id int64
 	var ss sqlStatement
-	var name string
 
 	// Get Type
-	switch o := obj.(type) {
-	case Vulnerability:
+	switch obj {
+	case "vuln":
 		ss = ssCheckVulnName
-		name = o.Name
-	case System:
+	case "sys":
 		ss = ssCheckSysName
-		name = o.Name
 	default:
 		return false, newErr(unknownType, "NameIsAvailable")
 	}
@@ -834,12 +831,12 @@ func UpdateExploitable(tx *sql.Tx, vid int64, exploitable bool) Err {
 }
 
 // UpdateFinder will update the finder for the given vulnerability ID.
-func UpdateFinder(tx *sql.Tx, vid int64, finder int) Err {
+func UpdateFinder(tx *sql.Tx, vid, finder int64) Err {
 	return execMutation(tx, ssUpdateFinder, finder, vid)
 }
 
 // UpdateInitiator will update the initiator for the given vulnerability ID.
-func UpdateInitiator(tx *sql.Tx, vid int64, initiator int) Err {
+func UpdateInitiator(tx *sql.Tx, vid, initiator int64) Err {
 	return execMutation(tx, ssUpdateInitiator, initiator, vid)
 }
 

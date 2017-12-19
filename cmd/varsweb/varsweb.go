@@ -88,6 +88,7 @@ func main() {
 	router.GET("/notes/:vuln", handleNotes)
 	router.POST("/notes/:noteid", handleNotesPost)
 	router.GET("/systems/:sys", handleSystems)
+	router.PUT("/vulnerability", handleVulnerabilityAdd)
 	router.GET("/vulnerability", handleVulnerabilityPage)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
 	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
@@ -324,6 +325,76 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	}
 }
 
+// handleVulnerabilityAdd adds the new vuln to VARS
+func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level <= PrivilegedUser {
+			name := r.FormValue("name")
+			summ := r.FormValue("summary")
+			cvss := r.FormValue("cvssScore")
+			cvsl := r.FormValue("cvssLink")
+			corp := r.FormValue("corpscore")
+			test := r.FormValue("test")
+			miti := r.FormValue("mitigation")
+			expb := r.FormValue("exploitable")
+			expl := r.FormValue("exploit")
+			exploitable, err := strconv.ParseBool(expb)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			cScore, err := strconv.ParseFloat(cvss, 32)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			corpscore, err := strconv.ParseFloat(corp, 32)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			vuln := varsapi.CreateVulnerability(name, summ, cvsl, test, miti, expl, exploitable, float32(cScore), float32(corpscore))
+			vuln.Finder = user.Emp.ID
+			vuln.Initiator = user.Emp.ID
+			err = varsapi.AddVulnerability(db, vuln)
+			if err != nil {
+				if varsapi.IsNameNotAvailableError(err) {
+					w.WriteHeader(http.StatusNotAcceptable)
+					return
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			vid, err := varsapi.GetVulnID(name)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			ist := struct {
+				ID int64
+			}{vid}
+			err = json.NewEncoder(w).Encode(ist)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
 // handleVulnerabilityPage serves the vulnerability page outline
 func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	user, err := getSession(r)
@@ -366,13 +437,29 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
-				data := struct {
-					U     *User
-					Vulns []*vars.Vulnerability
-				}{user, vulns}
-				err = templates.Lookup("vulns").Execute(w, data)
+				var data []interface{}
+				for _, v := range vulns {
+					var mit string
+					if v.Dates.Mitigated.Valid {
+						mit = v.Dates.Mitigated.Time.Format("Mon, 02 Jan 2006 15:04:05")
+					} else {
+						mit = ""
+					}
+					s := struct {
+						ID        int64
+						Name      string
+						Summary   string
+						Cvss      float32
+						CorpScore float32
+						Initiated string
+						Mitigated string
+					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
+					data = append(data, s)
+				}
+				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
-					http.Error(w, "Error with templating", http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 			case "open":
 				vulns, err := varsapi.GetOpenVulnerabilities()
@@ -401,13 +488,29 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
-				data := struct {
-					U     *User
-					Vulns []*vars.Vulnerability
-				}{user, vulns}
-				err = templates.Lookup("vulns").Execute(w, data)
+				var data []interface{}
+				for _, v := range vulns {
+					var mit string
+					if v.Dates.Mitigated.Valid {
+						mit = v.Dates.Mitigated.Time.Format("Mon, 02 Jan 2006 15:04:05")
+					} else {
+						mit = ""
+					}
+					s := struct {
+						ID        int64
+						Name      string
+						Summary   string
+						Cvss      float32
+						CorpScore float32
+						Initiated string
+						Mitigated string
+					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
+					data = append(data, s)
+				}
+				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
-					http.Error(w, "Error with templating", http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 			default:
 				vid, err := strconv.Atoi(v)
@@ -637,6 +740,23 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 	field := ps.ByName("field")
 	if user.Authed {
 		switch field {
+		case "name":
+			if user.Emp.Level <= PrivilegedUser {
+				name := r.FormValue("name")
+				err := varsapi.UpdateVulnerabilityName(db, int64(vid), name)
+				if err != nil {
+					if varsapi.IsNameNotAvailableError(err) {
+						w.WriteHeader(http.StatusNotAcceptable)
+						return
+					}
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		case "summary":
 			if user.Emp.Level <= StandardUser {
 				summ := r.FormValue("summary")
