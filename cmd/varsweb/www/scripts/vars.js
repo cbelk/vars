@@ -393,6 +393,23 @@ function showModalEdit(btnID, num) {
     hideAlerts();
 }
 
+function handleShowAffected(state) {
+    switch(state) {
+        case 'open':
+            $('.vuln-aff-open').show();
+            $('.vuln-aff-closed').hide();
+            break;
+        case 'closed':
+            $('.vuln-aff-closed').show();
+            $('.vuln-aff-open').hide();
+            break;
+        case 'all':
+            $('.vuln-aff-open').show();
+            $('.vuln-aff-closed').show();
+            break;
+    }
+}
+
 function handleAffectedAction(id, name, action) {
     hideAlerts();
     switch(action) {
@@ -411,6 +428,8 @@ function handleAffectedAction(id, name, action) {
             $('#vuln-modal').scrollTop(0);
             $('#vme-affected-'+id+' input').attr('checked', true);
             $('#vme-affected-'+id+' input').prop('checked', true);
+            $('#vme-affected-'+id).removeClass('vuln-aff-open');
+            $('#vme-affected-'+id).addClass('vuln-aff-closed');
             break;
         case 'uncheck':
             $('#vuln-modal-alert-warning-item').text('Mark '+name+' as un-patched?  ');
@@ -420,6 +439,8 @@ function handleAffectedAction(id, name, action) {
             $('#vuln-modal').scrollTop(0);
             $('#vme-affected-'+id+' input').removeAttr('checked');
             $('#vme-affected-'+id+' input').prop('checked', false);
+            $('#vme-affected-'+id).removeClass('vuln-aff-closed');
+            $('#vme-affected-'+id).addClass('vuln-aff-open');
             break;
     }
 }
@@ -801,10 +822,12 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-affected-table').empty();
     modal.find('#vme-add-affected-list').empty();
     for (i = 0; i < vuln.AffSystems.length; i++) {
-        modal.find('#vuln-modal-affected-table').append('<tr id="vme-affected-'+vuln.AffSystems[i].Sys.ID+'"><td><button type="button" class="btn-sm bg-white text-danger border-0" onclick="handleAffectedAction('+vuln.AffSystems[i].Sys.ID+', \''+vuln.AffSystems[i].Sys.Name+'\', \'delete\')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></td><td>' + vuln.AffSystems[i].Sys.Name + '</td><td>' + vuln.AffSystems[i].Sys.Description + '</td><td>'+ vuln.AffSystems[i].Sys.Location + '</td><td>'+ vuln.AffSystems[i].Sys.State + '</td><td><label class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input"><span class="custom-control-indicator"></span></label></td></tr>');
+        modal.find('#vuln-modal-affected-table').append('<tr class="vuln-aff-open" id="vme-affected-'+vuln.AffSystems[i].Sys.ID+'"><td><button type="button" class="btn-sm bg-white text-danger border-0" onclick="handleAffectedAction('+vuln.AffSystems[i].Sys.ID+', \''+vuln.AffSystems[i].Sys.Name+'\', \'delete\')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></td><td>' + vuln.AffSystems[i].Sys.Name + '</td><td>' + vuln.AffSystems[i].Sys.Description + '</td><td>'+ vuln.AffSystems[i].Sys.Location + '</td><td>'+ vuln.AffSystems[i].Sys.State + '</td><td><label class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input"><span class="custom-control-indicator"></span></label></td></tr>');
         if (vuln.AffSystems[i].Mitigated) {
             $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').attr('checked', true);
             $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').prop('checked', true);
+            $('#vme-affected-'+vuln.AffSystems[i].Sys.ID).removeClass('vuln-aff-open');
+            $('#vme-affected-'+vuln.AffSystems[i].Sys.ID).addClass('vuln-aff-closed');
         }
         $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').data('sid', vuln.AffSystems[i].Sys.ID);
         $('#vme-affected-'+vuln.AffSystems[i].Sys.ID+' input').change(function() {
