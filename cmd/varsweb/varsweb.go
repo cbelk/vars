@@ -27,7 +27,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/alexedwards/scs"
 	"github.com/cbelk/vars"
@@ -91,6 +93,7 @@ func main() {
 	router.PUT("/vulnerability", handleVulnerabilityAdd)
 	router.GET("/vulnerability", handleVulnerabilityPage)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
+	router.GET("/vulnerability/:vuln/:field", handleVulnerabilityField)
 	router.PUT("/vulnerability/:vuln/:field", handleVulnerabilityPut)
 	router.POST("/vulnerability/:vuln/:field", handleVulnerabilityPost)
 	router.DELETE("/vulnerability/:vuln/:field", handleVulnerabilityDelete)
@@ -318,6 +321,7 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 				}
 			default:
 				w.WriteHeader(http.StatusNotFound)
+				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
@@ -400,6 +404,47 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 }
 
+func handleVulnerabilityField(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	v := ps.ByName("vuln")
+	vid, err := strconv.Atoi(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "cve":
+			cve := ""
+			cves, err := varsapi.GetCves(int64(vid))
+			if err != nil {
+				if !varsapi.IsNoRowsError(err) {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+			sort.Strings(*cves)
+			cve = strings.Join(*cves, ", ")
+			s := struct {
+				CVE string
+			}{cve}
+			err = json.NewEncoder(w).Encode(s)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
 // handleVulnerabilityPage serves the vulnerability page outline
 func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	user, err := getSession(r)
@@ -448,11 +493,19 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				var data []interface{}
 				for _, v := range vulns {
-					var mit string
+					cve := ""
+					cves, err := varsapi.GetCves(v.ID)
+					if err != nil {
+						if !varsapi.IsNoRowsError(err) {
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+					}
+					sort.Strings(*cves)
+					cve = strings.Join(*cves, ", ")
+					mit := ""
 					if v.Dates.Mitigated.Valid {
 						mit = v.Dates.Mitigated.Time.Format("Mon, 02 Jan 2006 15:04:05")
-					} else {
-						mit = ""
 					}
 					s := struct {
 						ID        int64
@@ -460,9 +513,10 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 						Summary   string
 						Cvss      float32
 						CorpScore float32
+						Cve       string
 						Initiated string
 						Mitigated string
-					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
+					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, cve, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
 					data = append(data, s)
 				}
 				err = json.NewEncoder(w).Encode(data)
@@ -477,14 +531,25 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				var data []interface{}
 				for _, v := range vulns {
+					cve := ""
+					cves, err := varsapi.GetCves(v.ID)
+					if err != nil {
+						if !varsapi.IsNoRowsError(err) {
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+					}
+					sort.Strings(*cves)
+					cve = strings.Join(*cves, ", ")
 					s := struct {
 						ID        int64
 						Name      string
 						Summary   string
 						Cvss      float32
 						CorpScore float32
+						Cve       string
 						Initiated string
-					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05")}
+					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, cve, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05")}
 					data = append(data, s)
 				}
 				err = json.NewEncoder(w).Encode(data)
@@ -499,6 +564,16 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				var data []interface{}
 				for _, v := range vulns {
+					cve := ""
+					cves, err := varsapi.GetCves(v.ID)
+					if err != nil {
+						if !varsapi.IsNoRowsError(err) {
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+					}
+					sort.Strings(*cves)
+					cve = strings.Join(*cves, ", ")
 					var mit string
 					if v.Dates.Mitigated.Valid {
 						mit = v.Dates.Mitigated.Time.Format("Mon, 02 Jan 2006 15:04:05")
@@ -511,9 +586,10 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 						Summary   string
 						Cvss      float32
 						CorpScore float32
+						Cve       string
 						Initiated string
 						Mitigated string
-					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
+					}{v.ID, v.Name, v.Summary, v.Cvss, v.CorpScore, cve, v.Dates.Initiated.Format("Mon, 02 Jan 2006 15:04:05"), mit}
 					data = append(data, s)
 				}
 				err = json.NewEncoder(w).Encode(data)
@@ -629,6 +705,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
+			return
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -730,6 +807,7 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
+			return
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -928,6 +1006,7 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
+			return
 		}
 	}
 }

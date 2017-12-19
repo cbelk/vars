@@ -593,6 +593,11 @@ func GetConfig() vars.Config {
 	return vars.Conf
 }
 
+// GetCves returns a pointer to a slice of cves associated with the vulnid.
+func GetCves(vid int64) (*[]string, error) {
+	return vars.GetCves(vid)
+}
+
 // GetNoteAuthor returns the empid of the author of the note.
 func GetNoteAuthor(noteid int64) (int64, error) {
 	return vars.GetNoteAuthor(noteid)

@@ -214,6 +214,20 @@ function unbindHover() {
     $('#vuln-modal-section-exploit').unbind('mouseenter mouseleave');
 }
 
+function updateTableCve(vid) {
+    $.ajax({
+        method  : 'GET',
+        url     : '/vulnerability/'+vid+'/cve',
+        dataType: 'json',
+        success : function(data) {
+            $("tr[data-vid='"+vid+"']").find("td:eq(3)").text(data.CVE);
+        },
+        error: function() {
+            alert('Error updating the CVE column of the vulnerability table. You may need to refresh the page.');
+        }
+    });
+}
+
 function handleModalAddItem(btnID) {
     switch(btnID) {
         case 'vuln-modal-add-cve':
@@ -492,6 +506,7 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                         $('#vuln-modal-alert-success').show();
                         $('#vuln-modal').scrollTop(0);
                         $('#vuln-modal-div-cve-'+itemID).hide();
+                        updateTableCve(vid);
                     },
                     error: function() {
                         $('#vuln-modal-alert-danger').show();
@@ -881,7 +896,7 @@ $('#vuln-modal').on('hidden.bs.modal', function (event) {
 
 function loadVulnTable(state) {
     $('#vuln-table tbody').empty();
-    $('#vuln-table tr th:nth-child(6), table tr td:nth-child(6)').show();
+    $('#vuln-table tr th:nth-child(7), table tr td:nth-child(7)').show();
     $.ajax({
         method : 'GET',
         dataType    : 'json',
@@ -889,16 +904,16 @@ function loadVulnTable(state) {
         success: function(data) {
             if (data != null) {
                 for (i=0; i < data.length; i++) {
-                    $('#vuln-table tbody').append('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data[i].ID+'"><td>'+data[i].Name+'</td><td>'+data[i].Summary+'</td><td>'+data[i].Cvss+'</td><td>'+data[i].CorpScore+'</td><td>'+data[i].Initiated+'</td><td>'+data[i].Mitigated+'</td></tr>');
+                    $('#vuln-table tbody').append('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data[i].ID+'"><td>'+data[i].Name+'</td><td>'+data[i].Summary+'</td><td>'+data[i].Cvss+'</td><td>'+data[i].CorpScore+'</td><td>'+data[i].Cve+'</td><td>'+data[i].Initiated+'</td><td>'+data[i].Mitigated+'</td></tr>');
                 }
             }
             switch (state) {
                 case 'open':
-                    $('#vuln-table tr th:nth-child(6), table tr td:nth-child(6)').hide();
+                    $('#vuln-table tr th:nth-child(7), table tr td:nth-child(7)').hide();
                     break;
                 case 'closed':
                 case 'all':
-                    $('#vuln-table tr th:nth-child(6), table tr td:nth-child(6)').show();
+                    $('#vuln-table tr th:nth-child(7), table tr td:nth-child(7)').show();
                     break;
             }
         },
@@ -1017,6 +1032,7 @@ $(document).ready(function() {
                 var cveID = $('#vuln-modal-cve-list').children().length - 1;
                 appendCve(cve, cveID);
                 hideModalEdit();
+                updateTableCve(vid);
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();
@@ -1227,11 +1243,11 @@ $(document).ready(function() {
             dataType: 'json',
 			data    : fdata,
 			success : function(data) {
-                $('#vuln-table tbody').prepend('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data.ID+'"><td>'+name+'</td><td>'+summ+'</td><td>'+cvss+'</td><td>'+corp+'</td><td>'+init.toUTCString()+'</td><td></td></tr>');
+                $('#vuln-table tbody').prepend('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data.ID+'"><td>'+name+'</td><td>'+summ+'</td><td>'+cvss+'</td><td>'+corp+'</td><td></td><td>'+init.toUTCString()+'</td><td></td></tr>');
                 $('#vuln-modal').modal('hide');
                 var state = window.location.hash.replace('#', '').trim();
                 if (state != 'all' && state != 'closed') {
-                    $('#vuln-table tr th:nth-child(6), table tr td:nth-child(6)').hide();
+                    $('#vuln-table tr th:nth-child(7), table tr td:nth-child(7)').hide();
                 }
 			},
             error: function(j, s, err) {
