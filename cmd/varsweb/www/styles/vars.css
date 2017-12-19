@@ -79,3 +79,7 @@ fieldset[disabled] .btn-dark.active {
   color: #000000;
   background-color: #FFFFFF;
 }
+
+.navbar-vdark {
+  background-color: #000000;
+}
