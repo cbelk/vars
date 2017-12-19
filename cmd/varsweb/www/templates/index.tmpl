@@ -22,13 +22,13 @@
 
 {{define "index"}}
 {{template "header"}}
-{{template "navbar" .}}
-{{if .Authed}}
+{{template "navbar" .User}}
+{{if .User.Authed}}
 <div class="container">
-    <p class="text-dark">Hello {{.Emp.FirstName}} {{.Emp.LastName}}!</p>
+    <p class="text-dark">Hello {{.User.Emp.FirstName}} {{.User.Emp.LastName}}!</p>
 </div>
 {{end}}
-{{template "footer"}}
+{{template "footer" .Page}}
 {{end}}
 
 {% endraw %}

@@ -121,9 +121,14 @@ func handleIndex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	if user.Authed {
+		s := struct {
+			Page string
+			User interface{}
+		}{"index", user}
 		w.Header().Add("Content-Type", "text/html")
-		err := templates.Lookup("index").Execute(w, user)
+		err := templates.Lookup("index").Execute(w, s)
 		if err != nil {
+			fmt.Println(err)
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
 		}
 	} else {
@@ -404,8 +409,12 @@ func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httproute
 	}
 	if user.Authed {
 		if user.Emp.Level <= StandardUser {
+			s := struct {
+				Page string
+				User interface{}
+			}{"vuln", user}
 			w.Header().Add("Content-Type", "text/html")
-			err := templates.Lookup("vulns").Execute(w, user)
+			err := templates.Lookup("vulns").Execute(w, s)
 			if err != nil {
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
