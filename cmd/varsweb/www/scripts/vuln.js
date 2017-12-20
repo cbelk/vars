@@ -911,10 +911,10 @@ function loadVulnTable(state) {
     $('#vuln-table tbody').empty();
     $('#vuln-table tr th:nth-child(7), table tr td:nth-child(7)').show();
     $.ajax({
-        method : 'GET',
-        dataType    : 'json',
-        url    : '/vulnerability/'+state,
-        success: function(data) {
+        method  : 'GET',
+        dataType: 'json',
+        url     : '/vulnerability/'+state,
+        success : function(data) {
             if (data != null) {
                 for (i=0; i < data.length; i++) {
                     $('#vuln-table tbody').append('<tr data-toggle="modal" data-target="#vuln-modal" data-vid="'+data[i].ID+'"><td>'+data[i].Name+'</td><td>'+data[i].Summary+'</td><td>'+data[i].Cvss+'</td><td>'+data[i].CorpScore+'</td><td>'+data[i].Cve+'</td><td>'+data[i].Initiated+'</td><td>'+data[i].Mitigated+'</td></tr>');

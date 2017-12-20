@@ -34,6 +34,11 @@
                 <a class="nav-link" href="/vulnerability">Vulnerability</a>
             </li>
             {{end}}
+            {{if eq .Emp.Level 0}}
+            <li class="nav-item active">
+                <a class="nav-link" href="/employee">Employee</a>
+            </li>
+            {{end}}
         </ul>
         <form><button type="submit" class="btn btn-danger navbar-right" formaction="/logout">Logout</button></form>
         {{end}}

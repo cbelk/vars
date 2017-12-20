@@ -251,6 +251,12 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 	return nil
 }
 
+// CreateEmployee creates an employee object with the given parameters.
+func CreateEmployee(firstname, lastname, email, username string, level int) *vars.Employee {
+	emp := vars.Employee{FirstName: firstname, LastName: lastname, Email: email, UserName: username, Level: level}
+	return &emp
+}
+
 // CreateVulnerability creates a vulnerability object with the given parameters.
 func CreateVulnerability(name, summary, cvssLink, test, mitigation, exploit string, exploitable bool, cvss, corpscore float32) *vars.Vulnerability {
 	vuln := vars.Vulnerability{Name: name, Cvss: cvss, CorpScore: corpscore, CvssLink: GetVarsNullString(cvssLink), Summary: summary, Test: test, Mitigation: mitigation, Exploit: GetVarsNullString(exploit), Exploitable: GetVarsNullBool(exploitable)}
@@ -941,6 +947,118 @@ func UpdateEmployee(db *sql.DB, emp *vars.Employee) error {
 		if !vars.IsNilErr(err) {
 			return err
 		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateEmployeeEmail will update the email associated with the given empid.
+func UpdateEmployeeEmail(db *sql.DB, eid int64, email string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateEmpEmail(tx, eid, email)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateEmployeeLevel will update the level associated with the given empid.
+func UpdateEmployeeLevel(db *sql.DB, eid int64, level int) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateEmpLevel(tx, eid, level)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateEmployeeName will update the first/last name associated with the given empid.
+func UpdateEmployeeName(db *sql.DB, eid int64, fname, lname string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateEmpFname(tx, eid, fname)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	err = vars.UpdateEmpLname(tx, eid, lname)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateEmployeeUsername will update the username associated with the given empid.
+func UpdateEmployeeUsername(db *sql.DB, eid int64, username string) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateEmpUname(tx, eid, username)
+	if !vars.IsNilErr(err) {
+		return err
 	}
 
 	// Commit the transaction

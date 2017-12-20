@@ -87,6 +87,10 @@ func main() {
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
 	router.GET("/session", DisplaySession)
+	router.PUT("/employee", handleEmployeeAdd)
+	router.GET("/employee", handleEmployeePage)
+	router.GET("/employee/:emp", handleEmployees)
+	router.POST("/employee/:emp/:field", handleEmployeePost)
 	router.GET("/notes/:vuln", handleNotes)
 	router.POST("/notes/:noteid", handleNotesPost)
 	router.GET("/systems/:sys", handleSystems)
@@ -198,6 +202,218 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+// handleEmployeePage serves the employee page outline
+func handleEmployeePage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level == AdminUser {
+			s := struct {
+				Page string
+				User interface{}
+			}{"emp", user}
+			w.Header().Add("Content-Type", "text/html")
+			err := templates.Lookup("emps").Execute(w, s)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+// handleEmployees serves the employee objects
+func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	e := ps.ByName("emp")
+	if user.Authed {
+		if user.Emp.Level == AdminUser {
+			switch e {
+			case "all":
+				emps, err := varsapi.GetEmployees()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				var data []interface{}
+				for _, emp := range emps {
+					s := struct {
+						ID        int64
+						FirstName string
+						LastName  string
+						Email     string
+						UserName  string
+						Level     int
+					}{emp.ID, emp.FirstName, emp.LastName, emp.Email, emp.UserName, emp.Level}
+					data = append(data, s)
+				}
+				err = json.NewEncoder(w).Encode(data)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			default:
+				eid, err := strconv.Atoi(e)
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				emp, err := varsapi.GetEmployeeByID(int64(eid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				err = json.NewEncoder(w).Encode(emp)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+// handleEmployeeAdd adds the new employee to VARS
+func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level == AdminUser {
+			fname := r.FormValue("firstname")
+			lname := r.FormValue("lastname")
+			email := r.FormValue("email")
+			uname := r.FormValue("username")
+			l := r.FormValue("level")
+			level, err := strconv.Atoi(l)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			emp := varsapi.CreateEmployee(fname, lname, email, uname, level)
+			err = varsapi.AddEmployee(db, emp)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			ist := struct {
+				ID int64
+			}{emp.ID}
+			err = json.NewEncoder(w).Encode(ist)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	e := ps.ByName("emp")
+	eid, err := strconv.Atoi(e)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "name":
+			if user.Emp.Level == AdminUser {
+				fname := r.FormValue("firstname")
+				lname := r.FormValue("lastname")
+				err := varsapi.UpdateEmployeeName(db, int64(eid), fname, lname)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "email":
+			if user.Emp.Level == AdminUser {
+				email := r.FormValue("email")
+				err := varsapi.UpdateEmployeeEmail(db, int64(eid), email)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "username":
+			if user.Emp.Level == AdminUser {
+				username := r.FormValue("username")
+				err := varsapi.UpdateEmployeeUsername(db, int64(eid), username)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "level":
+			if user.Emp.Level == AdminUser {
+				l := r.FormValue("level")
+				level, err := strconv.Atoi(l)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = varsapi.UpdateEmployeeLevel(db, int64(eid), level)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			w.WriteHeader(http.StatusTeapot)
+			return
+		}
+	}
 }
 
 func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -476,7 +692,7 @@ func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httproute
 	}
 }
 
-// handleVulnerabilities serves the vulnerability pages
+// handleVulnerabilities serves the vulnerability objects
 func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user, err := getSession(r)
 	if err != nil {

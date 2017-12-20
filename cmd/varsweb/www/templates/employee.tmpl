@@ -1,0 +1,194 @@
+//////////////////////////////////////////////////////////////////////////////////////
+//                                                                                  //
+//    VARS (Vulnerability Analysis Reference System) is software used to track      //
+//    vulnerabilities from discovery through analysis to mitigation.                //
+//    Copyright (C) 2017  Christian Belk                                            //
+//                                                                                  //
+//    This program is free software: you can redistribute it and/or modify          //
+//    it under the terms of the GNU General Public License as published by          //
+//    the Free Software Foundation, either version 3 of the License, or             //
+//    (at your option) any later version.                                           //
+//                                                                                  //
+//    This program is distributed in the hope that it will be useful,               //
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of                //
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                 //
+//    GNU General Public License for more details.                                  //
+//                                                                                  //
+//    See the full License here: https://github.com/cbelk/vars/blob/master/LICENSE  //
+//                                                                                  //
+//////////////////////////////////////////////////////////////////////////////////////
+
+{% raw %}
+
+// Display employees
+{{define "emps"}}
+{{template "header"}}
+{{template "navbar" .User}}
+{{if .User.Authed}}
+<nav class="navbar navbar-expanded-lg fixed-top fixed-top-2 navbar-dark navbar-vdark">
+    <div class="container-fluid d-flex flex-row justify-content-between">
+            <button type="button" class="btn-sm btn-success" id="add-emp" data-toggle="modal" data-target="#emp-modal" data-eid="-2" aria-label="Add">
+                <span aria-hidden="true">&plus;</span>
+            </button>
+            <form class="form-inline"><input type="search" id="emp-table-search" placeholder="Search by name or CVE" aria-label="Search"></form>
+    </div>
+</nav>
+<div class="container-fluid pt-3 pb-3 pl-5 pr-5 vars-content">
+    <div class="table-responsive">
+    <table class="table table-striped table-dark table-bordered table-hover" id="emp-table">
+        <thead>
+            <tr>
+                <th scope="col" class="col-2" onclick="sortTable('emp-table', 0)">First Name</th>
+                <th scope="col" class="col-3" onclick="sortTable('emp-table', 1)">Last Name</th>
+                <th scope="col" class="col-1" onclick="sortTable('emp-table', 2)">Email</th>
+                <th scope="col" class="col-1" onclick="sortTable('emp-table', 3)">Username</th>
+                <th scope="col" class="col-3" onclick="sortTable('emp-table', 4)">Level</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    </div>
+</div>
+{{template "emp-modal"}}
+{{end}}
+{{template "footer" .Page}}
+{{end}}
+
+// Employee Modal
+{{define "emp-modal"}}
+<div class="modal fade" id="emp-modal" tabindex="-1" role="dialog" aria-labelledby="emp-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" id="emp-modal-section-title">
+                <h1 class="modal-title" id="emp-modal-label">
+                    <div class="row justify-content-start">
+                    <div class="col-1">
+                        <button type="button" class="btn-sm bg-white text-success border-0 eme-btn eme-btn-title eme-pen" id="emp-modal-edit-title" onclick="showModalEdit(this.id)" aria-label="Edit">
+                            <span aria-hidden="true">&#9998;</span>
+                        </button>
+                    </div>
+                    <div class="col-11">
+                        <form class="form-inline" id="emp-modal-form-title">
+                            <input type="text" class="form-control-plaintext" readonly id="emp-modal-fname" name="firstname" value="" placeholder="First Name">
+                            <input type="text" class="form-control-plaintext" readonly id="emp-modal-lname" name="lastname" value="" placeholder="Last Name">
+                            <button type="submit" class="btn btn-dark eme-btn-submit eme-btn-title-submit">Submit</button>
+                        </form>
+                    </div>
+                    </div>
+                </h1>
+                <div class="btn-group" role="group" aria-label="Modal top buttons">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body">
+            <div class="containier-fluid">
+                <!-- Empid -->
+                <div class="row justify-content-start">
+                    <div class="col">
+                        <p id="emp-modal-empid" hidden>-1</p>
+                    </div>
+                </div>
+                <!-- Empid end -->
+                <!-- Alerts -->
+                <div class="row justify-content-start alert alert-success" role="alert" id="emp-modal-alert-success">
+                Employee successfully updated
+                </div>
+                <div class="row justify-content-start alert alert-danger" role="alert" id="emp-modal-alert-danger">
+                <p id="emp-modal-alert-danger-item">There was an error processing your request</p>
+                </div>
+                <div class="row justify-content-start alert alert-warning" role="alert" id="emp-modal-alert-warning">
+                <p id="emp-modal-alert-warning-item"></p> <button type="button" class="btn btn-success" id="emp-modal-warning-yes" onclick="placeholder()">Yes</button><button type="button" class="btn btn-danger" id="emp-modal-warning-no" onclick="placeholder()">No</button>
+                </div>
+                <!-- Alerts end -->
+                <!-- Email -->
+                <div id="emp-modal-section-email">
+                <div class="row justify-content-start">
+                    <div class="col-1">
+                        <p></p>
+                    </div>
+                    <div class="col-11">
+                        <h3>Email Address</h3>
+                    </div>
+                </div>
+                <div class="row justify-content-start" id="emp-modal-div-email">
+                    <div class="col-1">
+                        <button type="button" class="btn-sm bg-white text-success border-0 eme-btn eme-btn-email eme-pen" id="emp-modal-edit-email" onclick="showModalEdit(this.id)" aria-label="Edit">
+                            <span aria-hidden="true">&#9998;</span>
+                        </button>
+                    </div>
+                    <div class="col-11">
+                        <form id="emp-modal-form-email" action="#" method="post">
+                            <input type="email" id="emp-modal-email" name="email" readonly class="form-control-plaintext">
+                            <button type="submit" class="btn btn-dark eme-btn-submit">Submit</button>
+                        </form>
+                    </div>
+                </div>
+                </div>
+                <!-- Email end -->
+                <hr>
+                <!-- Username -->
+                <div id="emp-modal-section-uname">
+                <div class="row justify-content-start">
+                    <div class="col-1">
+                        <p></p>
+                    </div>
+                    <div class="col-11">
+                        <h3>Username</h3>
+                    </div>
+                </div>
+                <div class="row justify-content-start" id="emp-modal-div-uname">
+                    <div class="col-1">
+                        <button type="button" class="btn-sm bg-white text-success border-0 eme-btn eme-btn-uname eme-pen" id="emp-modal-edit-uname" onclick="showModalEdit(this.id)" aria-label="Edit">
+                            <span aria-hidden="true">&#9998;</span>
+                        </button>
+                    </div>
+                    <div class="col-11">
+                        <form id="emp-modal-form-uname" action="#" method="post">
+                            <input type="text" id="emp-modal-uname" name="username" readonly class="form-control-plaintext">
+                            <button type="submit" class="btn btn-dark eme-btn-submit">Submit</button>
+                        </form>
+                    </div>
+                </div>
+                </div>
+                <!-- Username end -->
+                <hr>
+                <!-- Level -->
+                <div id="emp-modal-section-level">
+                <div class="row justify-content-start">
+                    <div class="col-1">
+                        <p></p>
+                    </div>
+                    <div class="col-11">
+                        <h3>User Level</h3>
+                    </div>
+                </div>
+                <div class="row justify-content-start" id="emp-modal-div-level">
+                    <div class="col-1">
+                        <button type="button" class="btn-sm bg-white text-success border-0 eme-btn eme-btn-level eme-pen" id="emp-modal-edit-level" onclick="showModalEdit(this.id)" aria-label="Edit">
+                            <span aria-hidden="true">&#9998;</span>
+                        </button>
+                    </div>
+                    <div class="col-11">
+                        <form id="emp-modal-form-level" action="#" method="post">
+                            <input type="number" id="emp-modal-level" name="level" min="0" max="3" readonly class="form-control-plaintext" value="">
+                            <button type="submit" class="btn btn-dark eme-btn-submit">Submit</button>
+                        </form>
+                    </div>
+                </div>
+                </div>
+                <!-- Level end -->
+            </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-dark eme-btn-submit" id="modal-add-emp-btn">Submit</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{% endraw %}
