@@ -20,10 +20,8 @@
 
 {% raw %}
 
-{{define "login"}}
-{{template "header"}}
-{{template "navbar"}}
-<div class="container">
+{{define "login-form"}}
+<div class="container vars-content">
     <form action="" id="signInForm" class="form-signin" method="post">
         <h2 class="form-signin-heading text-center">Please Sign In</h2>
         <label for="username" class="sr-only">Username</label>
@@ -33,14 +31,23 @@
         <button class="btn btn-large btn-primary btn-block" type="submit">Sign In</button>
     </form>
 </div>
-{{template "footer"}}
+{{end}}
+
+{{define "login"}}
+{{template "header"}}
+{{template "navbar"}}
+{{template "login-form"}}
+{{template "footer" .}}
 {{end}}
 
 {{define "login-failed"}}
-{{template "login"}}
+{{template "header"}}
+{{template "navbar"}}
+{{template "login-form"}}
 <div class="container">
     <p class="text-danger text-center">Invalid credentials</p>
 </div>
+{{template "footer" .}}
 {{end}}
 
 {% endraw %}
