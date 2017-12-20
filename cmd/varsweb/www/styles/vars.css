@@ -83,3 +83,11 @@ fieldset[disabled] .btn-dark.active {
 .navbar-vdark {
   background-color: #000000;
 }
+
+.fixed-top-2 {
+    margin-top: 92px;
+}
+
+.vars-content {
+    margin-top: 160px;
+}
