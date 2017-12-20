@@ -220,10 +220,23 @@ function updateTableCve(vid) {
         url     : '/vulnerability/'+vid+'/cve',
         dataType: 'json',
         success : function(data) {
-            $("tr[data-vid='"+vid+"']").find("td:eq(3)").text(data.CVE);
+            $("tr[data-vid='"+vid+"']").find("td:eq(4)").text(data.CVE);
         },
         error: function() {
             alert('Error updating the CVE column of the vulnerability table. You may need to refresh the page.');
+        }
+    });
+}
+
+function handleFuzzySearch() {
+    var str = $('#vuln-table-search').val().toLowerCase();
+    $('#vuln-table tbody tr').each(function() {
+        var name = $(this).find('td:eq(0)').text().toLowerCase();
+        var cves = $(this).find('td:eq(4)').text().toLowerCase();
+        if (!fuzzysearch(str, name) && !fuzzysearch(str, cves)) {
+            $(this).hide();
+        } else {
+            $(this).show();
         }
     });
 }
@@ -1259,6 +1272,9 @@ $(document).ready(function() {
             }
 		});
 	});
+    $('#vuln-table-search').keyup(function() {
+        handleFuzzySearch();
+    });
     // Load vuln table
     var state = window.location.hash.replace('#', '').trim();
     switch(state) {
