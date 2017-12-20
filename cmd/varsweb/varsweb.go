@@ -595,14 +595,9 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			vid, err := varsapi.GetVulnID(name)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
 			ist := struct {
 				ID int64
-			}{vid}
+			}{vuln.ID}
 			err = json.NewEncoder(w).Encode(ist)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
