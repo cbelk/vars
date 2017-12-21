@@ -96,6 +96,8 @@ function handleAddVuln() {
     $('#vuln-modal-mitigation').removeClass('form-control-plaintext');
     $('#vuln-modal-mitigation').addClass('form-control');
     $('#vuln-modal-mitigation').val('');
+    appendFinderList();
+    $('#vuln-modal-finder').attr('disabled', false);
     $('#vuln-modal-exploitable').attr('disabled', false);
     $('#vuln-modal-exploitable option[value="true"]').removeAttr('selected');
     $('#vuln-modal-exploitable option[value="false"]').attr('selected', true);
@@ -691,7 +693,7 @@ function appendFinderList(vuln) {
         success : function(data) {
             $('#vuln-modal-finder').empty();
             for (i=0; i < data.length; i++) {
-                if (vuln.Finder == data[i].ID) {
+                if (vuln != null && vuln.Finder == data[i].ID) {
                     $('#vuln-modal-finder').append('<option value="'+data[i].ID+'" selected>'+data[i].Name+'</option>');
                 } else {
                     $('#vuln-modal-finder').append('<option value="'+data[i].ID+'">'+data[i].Name+'</option>');
@@ -1325,10 +1327,11 @@ $(document).ready(function() {
         var dataCvss  = $('#vuln-modal-form-cvss').serialize();
         var dataCorp  = $('#vuln-modal-form-corpscore').serialize();
         var dataTest  = $('#vuln-modal-form-test').serialize();
+        var dataFind  = $('#vuln-modal-form-finder').serialize();
         var dataMit   = $('#vuln-modal-form-mitigation').serialize();
         var dataExpb  = $('#vuln-modal-form-exploitable').serialize();
         var dataExp   = $('#vuln-modal-form-exploit').serialize();
-        var fdata     = dataTitle+'&'+dataSum+'&'+dataCvss+'&'+dataCorp+'&'+dataTest+'&'+dataMit+'&'+dataExpb+'&'+dataExp;
+        var fdata     = dataTitle+'&'+dataSum+'&'+dataCvss+'&'+dataCorp+'&'+dataTest+'&'+dataFind+'&'+dataMit+'&'+dataExpb+'&'+dataExp;
         var name      = $('#vuln-modal-title').val();
         var summ      = $('#vuln-modal-summary').val();
         var cvss      = $('#vuln-modal-cvss-edit').val();

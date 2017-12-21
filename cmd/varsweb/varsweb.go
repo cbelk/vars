@@ -658,6 +658,7 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 			cvsl := r.FormValue("cvssLink")
 			corp := r.FormValue("corpscore")
 			test := r.FormValue("test")
+			find := r.FormValue("finder")
 			miti := r.FormValue("mitigation")
 			expb := r.FormValue("exploitable")
 			expl := r.FormValue("exploit")
@@ -677,7 +678,12 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 				return
 			}
 			vuln := varsapi.CreateVulnerability(name, summ, cvsl, test, miti, expl, exploitable, float32(cScore), float32(corpscore))
-			vuln.Finder = user.Emp.ID
+			finder, err := strconv.Atoi(find)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			vuln.Finder = int64(finder)
 			vuln.Initiator = user.Emp.ID
 			err = varsapi.AddVulnerability(db, vuln)
 			if err != nil {
