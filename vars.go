@@ -35,9 +35,13 @@ const (
 	ssCheckSysName
 	ssDeleteAffected
 	ssDeleteCve
+	ssDeleteDates
+	ssDeleteExploit
+	ssDeleteImpact
 	ssDeleteNote
 	ssDeleteRef
 	ssDeleteTicket
+	ssDeleteVuln
 	ssGetAffected
 	ssGetClosedVulnIDs
 	ssGetCves
@@ -110,9 +114,13 @@ var (
 		ssCheckSysName:      "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteAffected:    "DELETE FROM affected WHERE vulnid=$1 AND sysid=$2;",
 		ssDeleteCve:         "DELETE FROM cves WHERE vulnid=$1 AND cve=$2;",
+		ssDeleteDates:       "DELETE FROM dates WHERE vulnid=$1;",
+		ssDeleteExploit:     "DELETE FROM exploits WHERE vulnid=$1;",
+		ssDeleteImpact:      "DELETE FROM impact WHERE vulnid=$1;",
 		ssDeleteNote:        "DELETE FROM notes WHERE noteid=$1;",
 		ssDeleteRef:         "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
 		ssDeleteTicket:      "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
+		ssDeleteVuln:        "DELETE FROM vuln WHERE vulnid=$1;",
 		ssGetAffected:       "SELECT sysid, mitigated FROM affected WHERE vulnid=$1;",
 		ssGetClosedVulnIDs:  "SELECT vulnid FROM dates WHERE mitigated IS NOT NULL;",
 		ssGetCves:           "SELECT cve FROM cves WHERE vulnid=$1;",
@@ -179,9 +187,13 @@ var (
 		ssActiveSystems:     "GetActiveSystems",
 		ssDeleteAffected:    "DeleteAffected",
 		ssDeleteCve:         "DeleteCve",
+		ssDeleteDates:       "DeleteDates",
+		ssDeleteExploit:     "DeleteExploit",
+		ssDeleteImpact:      "DeleteImpact",
 		ssDeleteNote:        "DeleteNote",
 		ssDeleteRef:         "DeleteRef",
 		ssDeleteTicket:      "DeleteTicket",
+		ssDeleteVuln:        "DeleteVulnerability",
 		ssGetAffected:       "GetAffected",
 		ssGetCves:           "GetCves",
 		ssGetEmployee:       "GetEmployee",
@@ -319,6 +331,21 @@ func DeleteCve(tx *sql.Tx, vid int64, cve string) Err {
 	return execMutation(tx, ssDeleteCve, vid, cve)
 }
 
+// DeleteDates deletes the row in the dates table with the given vulnid.
+func DeleteDates(tx *sql.Tx, vid int64) Err {
+	return execMutation(tx, ssDeleteDates, vid)
+}
+
+// DeleteExploit deletes the row in the exploits table with the given vulnid.
+func DeleteExploit(tx *sql.Tx, vid int64) Err {
+	return execMutation(tx, ssDeleteExploit, vid)
+}
+
+// DeleteImpact deletes the row in the impact table with the given vulnid.
+func DeleteImpact(tx *sql.Tx, vid int64) Err {
+	return execMutation(tx, ssDeleteImpact, vid)
+}
+
 // DeleteNote deletes the row in the notes table with the given noteid.
 func DeleteNote(tx *sql.Tx, noteid int64) Err {
 	return execMutation(tx, ssDeleteNote, noteid)
@@ -332,6 +359,11 @@ func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
 // DeleteTicket deletes the row in the tickets table with the given vulnid and ticket.
 func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 	return execMutation(tx, ssDeleteTicket, vid, ticket)
+}
+
+// DeleteVulnerability deletes the row in the vuln table with the given vulnid.
+func DeleteVulnerability(tx *sql.Tx, vid int64) Err {
+	return execMutation(tx, ssDeleteVuln, vid)
 }
 
 // GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.

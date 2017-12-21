@@ -79,6 +79,7 @@ function undoAddHides() {
     $('#vuln-modal-section-date-closed').show();
     $('#modal-close-vuln-btn').show();
     $('#modal-reopen-vuln-btn').show();
+    $('#modal-delete-vuln-btn').show();
 }
 
 function handleAddVuln() {
@@ -133,6 +134,7 @@ function handleAddVuln() {
     $('.vme-pen').hide();
     $('#modal-close-vuln-btn').hide();
     $('#modal-reopen-vuln-btn').hide();
+    $('#modal-delete-vuln-btn').hide();
     $('#modal-add-vuln-btn').show();
 }
 
@@ -495,7 +497,7 @@ function handleAffectedAction(id, name, action) {
     }
 }
 
-function showModalDelete(btnID, num) {
+function showModalPrompt(btnID, num) {
     hideAlerts();
     switch(btnID) {
         case 'cve':
@@ -523,6 +525,24 @@ function showModalDelete(btnID, num) {
             $('#vuln-modal-alert-warning-item').text('Delete note?  ');
             $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("note", "yes", "'+num+'")');
             $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("note", "no", "'+num+'")');
+            $('#vuln-modal-alert-warning').show();
+            break;
+        case 'modal-delete-vuln-btn':
+            $('#vuln-modal-alert-warning-item').text('Delete this vulnerability analysis?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("vuln", "yes")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("vuln", "no")');
+            $('#vuln-modal-alert-warning').show();
+            break;
+        case 'modal-reopen-vuln-btn':
+            $('#vuln-modal-alert-warning-item').text('Re-open this vulnerability analysis?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("reopen", "yes")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("reopen", "no")');
+            $('#vuln-modal-alert-warning').show();
+            break;
+        case 'modal-close-vuln-btn':
+            $('#vuln-modal-alert-warning-item').text('Close this vulnerability analysis?  ');
+            $('#vuln-modal-warning-yes').attr('onclick', 'handlePromptChoice("close", "yes")');
+            $('#vuln-modal-warning-no').attr('onclick', 'handlePromptChoice("close", "no")');
             $('#vuln-modal-alert-warning').show();
             break;
     }
@@ -667,6 +687,61 @@ function handlePromptChoice(btnId, choice, item, itemID) {
                 });
             }
             break;
+        case 'vuln':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method : 'DELETE',
+                    url    : '/vulnerability/'+vid+'/vuln',
+                    success: function(data) {
+                        $('#vuln-modal').modal('hide');
+                        $("tr[data-vid='"+vid+"']").remove();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                    }
+                });
+            }
+            break;
+        case 'reopen':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method : 'DELETE',
+                    url    : '/vulnerability/'+vid+'/mitigated',
+                    success: function(data) {
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal').scrollTop(0);
+                        $("tr[data-vid='"+vid+"']").hide();
+                        $('#modal-reopen-vuln-btn').hide();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                    }
+                });
+            }
+            break;
+        case 'close':
+            if (choice == 'yes') {
+                var vid = $('#vuln-modal-vulnid').text();
+                $.ajax({
+                    method : 'PUT',
+                    url    : '/vulnerability/'+vid+'/mitigated',
+                    success: function(data) {
+                        $('#vuln-modal-alert-success').show();
+                        $('#vuln-modal').scrollTop(0);
+                        $("tr[data-vid='"+vid+"']").hide();
+                        $('#modal-close-vuln-btn').hide();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                    }
+                });
+            }
+            break;
     }
     hideAlerts();
 }
@@ -722,7 +797,7 @@ function appendFinderList(vuln) {
 }
 
 function appendCve(cve, num) {
-    $('#vuln-modal-cve-list').append('<div class="row justify-content-start" id="vuln-modal-div-cve-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-cve" id="vuln-modal-edit-cve-' + num + '-btn" data-edit-btn-group="cve" onclick="showModalEdit(\'cve\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-cve" id="vuln-modal-delete-cve-' + num + '-btn" data-delete-btn-group="cve" onclick="showModalDelete(\'cve\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+num+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + num + '"value="' + cve + '" name="cve" data-original="'+cve+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-cve-'+num+'-submit">Submit</button></form></div></div>');
+    $('#vuln-modal-cve-list').append('<div class="row justify-content-start" id="vuln-modal-div-cve-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-cve" id="vuln-modal-edit-cve-' + num + '-btn" data-edit-btn-group="cve" onclick="showModalEdit(\'cve\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-cve" id="vuln-modal-delete-cve-' + num + '-btn" data-delete-btn-group="cve" onclick="showModalPrompt(\'cve\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+num+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + num + '"value="' + cve + '" name="cve" data-original="'+cve+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-cve-'+num+'-submit">Submit</button></form></div></div>');
     $('#vuln-modal-form-cve-'+num).on('submit', {cveid: num}, function(event) {
         event.preventDefault();
         var cveid = event.data.cveid;
@@ -749,7 +824,7 @@ function appendCve(cve, num) {
 }
 
 function appendTicket(ticket, num) {
-    $('#vuln-modal-ticket-list').append('<div class="row justify-content-start" id="vuln-modal-div-ticket-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-ticket" id="vuln-modal-edit-ticket-' + num + '-btn" data-edit-btn-group="ticket" onclick="showModalEdit(\'ticket\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-ticket" id="vuln-modal-delete-ticket-' + num + '-btn" data-delete-btn-group="ticket" onclick="showModalDelete(\'ticket\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-ticket-'+num+'"> <input type="text" class="form-control-plaintext edit-ticket-input" readonly id="vuln-modal-edit-ticket-' + num + '"value="' + ticket + '" name="ticket" data-original="'+ticket+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-ticket-'+num+'-submit">Submit</button></form></div></div>');
+    $('#vuln-modal-ticket-list').append('<div class="row justify-content-start" id="vuln-modal-div-ticket-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-ticket" id="vuln-modal-edit-ticket-' + num + '-btn" data-edit-btn-group="ticket" onclick="showModalEdit(\'ticket\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-ticket" id="vuln-modal-delete-ticket-' + num + '-btn" data-delete-btn-group="ticket" onclick="showModalPrompt(\'ticket\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-ticket-'+num+'"> <input type="text" class="form-control-plaintext edit-ticket-input" readonly id="vuln-modal-edit-ticket-' + num + '"value="' + ticket + '" name="ticket" data-original="'+ticket+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-ticket-'+num+'-submit">Submit</button></form></div></div>');
     $('#vuln-modal-form-ticket-'+num).on('submit', {ticketid: num}, function(event) {
         event.preventDefault();
         var ticketid = event.data.ticketid;
@@ -776,7 +851,7 @@ function appendTicket(ticket, num) {
 }
 
 function appendRef(ref, num) {
-    $('#vuln-modal-ref-list').append('<div class="row justify-content-start" id="vuln-modal-div-ref-'+num+'"><div class="col-1"><div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-ref" id="vuln-modal-edit-ref-'+num+'-btn" data-edit-btn-group="ref" onclick="showModalEdit(\'ref\','+num+')" aria-label="Edit"><span aria-hidden="true">&#9998;</span></button><button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-ref" id="vuln-modal-delete-ref-'+num+'-btn" data-delete-btn-group="ref" onclick="showModalDelete(\'ref\','+num+')" aria-label="Delete"><span aria-hidden="true">&times;</span></button></div></div><div class="col-11"><a id="vuln-modal-ref-'+num+'" href="'+ref+'" class="text-primary">'+ref+'</a></div></div><div class="row justify-content-start vme-div-ref" id="vuln-modal-div-edit-ref-'+num+'"><div class="col-1"><p></p></div><div class="col-11"><form id="vuln-modal-form-ref-'+num+'"><div class="form-group row"><label for="vuln-modal-edit-ref-'+num+'" class="col-form-label">Reference link</label><input type="url" class="form-control edit-ref-input" id="vuln-modal-edit-ref-'+num+'" value="'+ref+'" name="ref" data-original="'+ref+'"></div><button type="submit" class="btn btn-dark" id="vuln-modal-edit-ref-'+num+'-submit">Submit</button></form></div></div>');
+    $('#vuln-modal-ref-list').append('<div class="row justify-content-start" id="vuln-modal-div-ref-'+num+'"><div class="col-1"><div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-ref" id="vuln-modal-edit-ref-'+num+'-btn" data-edit-btn-group="ref" onclick="showModalEdit(\'ref\','+num+')" aria-label="Edit"><span aria-hidden="true">&#9998;</span></button><button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-ref" id="vuln-modal-delete-ref-'+num+'-btn" data-delete-btn-group="ref" onclick="showModalPrompt(\'ref\','+num+')" aria-label="Delete"><span aria-hidden="true">&times;</span></button></div></div><div class="col-11"><a id="vuln-modal-ref-'+num+'" href="'+ref+'" class="text-primary">'+ref+'</a></div></div><div class="row justify-content-start vme-div-ref" id="vuln-modal-div-edit-ref-'+num+'"><div class="col-1"><p></p></div><div class="col-11"><form id="vuln-modal-form-ref-'+num+'"><div class="form-group row"><label for="vuln-modal-edit-ref-'+num+'" class="col-form-label">Reference link</label><input type="url" class="form-control edit-ref-input" id="vuln-modal-edit-ref-'+num+'" value="'+ref+'" name="ref" data-original="'+ref+'"></div><button type="submit" class="btn btn-dark" id="vuln-modal-edit-ref-'+num+'-submit">Submit</button></form></div></div>');
     $('#vuln-modal-form-ref-'+num).on('submit', {refid: num}, function(event) {
         event.preventDefault();
         var refid = event.data.refid;
@@ -814,7 +889,7 @@ function appendNotes(vid) {
             if (data != null) {
                 for (i=0; i < data.length; i++) {
                     if (data[i].Editable) {
-                        $('#vuln-modal-notes-list').append('<div class="card text-white bg-dark mb-3" id="vuln-note-'+data[i].Nid+'"><div class="card-header"><button type="button" class="btn-sm bg-dark text-success border-0" id="vuln-modal-edit-note-'+data[i].Nid+'-btn" onclick="showModalEdit(\'note\','+data[i].Nid+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span></button> <button type="button" class="btn-sm bg-dark text-danger border-0" id="vuln-modal-delete-note-'+data[i].Nid+'-btn" data-delete-btn-group="ref" onclick="showModalDelete(\'note\','+data[i].Nid+')" aria-label="Delete"><span aria-hidden="true">&times;</span></button><p class="text-right">'+data[i].Added+'</p></div><div class="card-body"><h4 class="card-title">'+data[i].Emp+'</h4><form class="form-inline" id="vuln-modal-form-note-'+data[i].Nid+'"> <textarea class="form-control-plaintext edit-note-input text-white bg-dark" readonly id="vuln-modal-edit-note-'+data[i].Nid+'"value="'+data[i].Nid+'" name="note" rows="4" cols="65">'+data[i].Note+'</textarea><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-note-'+data[i].Nid+'-submit">Submit</button></form></div></div></div></div>');
+                        $('#vuln-modal-notes-list').append('<div class="card text-white bg-dark mb-3" id="vuln-note-'+data[i].Nid+'"><div class="card-header"><button type="button" class="btn-sm bg-dark text-success border-0" id="vuln-modal-edit-note-'+data[i].Nid+'-btn" onclick="showModalEdit(\'note\','+data[i].Nid+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span></button> <button type="button" class="btn-sm bg-dark text-danger border-0" id="vuln-modal-delete-note-'+data[i].Nid+'-btn" data-delete-btn-group="ref" onclick="showModalPrompt(\'note\','+data[i].Nid+')" aria-label="Delete"><span aria-hidden="true">&times;</span></button><p class="text-right">'+data[i].Added+'</p></div><div class="card-body"><h4 class="card-title">'+data[i].Emp+'</h4><form class="form-inline" id="vuln-modal-form-note-'+data[i].Nid+'"> <textarea class="form-control-plaintext edit-note-input text-white bg-dark" readonly id="vuln-modal-edit-note-'+data[i].Nid+'"value="'+data[i].Nid+'" name="note" rows="4" cols="65">'+data[i].Note+'</textarea><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-note-'+data[i].Nid+'-submit">Submit</button></form></div></div></div></div>');
                         $('#vuln-modal-form-note-'+data[i].Nid).on('submit', {noteid: data[i].Nid}, function(event) {
                             event.preventDefault();
                             var noteid = event.data.noteid;
@@ -1331,42 +1406,6 @@ $(document).ready(function() {
                 $('#vuln-modal').scrollTop(0);
                 appendNotes(vid);
                 $('#vuln-modal-add-note').val('');
-			},
-            error: function() {
-                $('#vuln-modal-alert-danger').show();
-                $('#vuln-modal').scrollTop(0);
-            }
-		});
-	});
-	$('#modal-close-vuln-btn').on('click', function(event) {
-		event.preventDefault();
-		var vid   = $('#vuln-modal-vulnid').text();
-		$.ajax({
-			method : 'PUT',
-			url    : '/vulnerability/'+vid+'/mitigated',
-			success: function(data) {
-				$('#vuln-modal-alert-success').show();
-                $('#vuln-modal').scrollTop(0);
-				$("tr[data-vid='"+vid+"']").hide();
-                $('#modal-close-vuln-btn').hide();
-			},
-            error: function() {
-                $('#vuln-modal-alert-danger').show();
-                $('#vuln-modal').scrollTop(0);
-            }
-		});
-	});
-	$('#modal-reopen-vuln-btn').on('click', function(event) {
-		event.preventDefault();
-		var vid   = $('#vuln-modal-vulnid').text();
-		$.ajax({
-			method : 'DELETE',
-			url    : '/vulnerability/'+vid+'/mitigated',
-			success: function(data) {
-				$('#vuln-modal-alert-success').show();
-                $('#vuln-modal').scrollTop(0);
-				$("tr[data-vid='"+vid+"']").hide();
-                $('#modal-reopen-vuln-btn').hide();
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

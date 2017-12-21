@@ -1137,6 +1137,17 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "vuln":
+			if user.Emp.Level <= PrivilegedUser {
+				err := varsapi.DeleteVulnerability(db, int64(vid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
 			return

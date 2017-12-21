@@ -575,6 +575,112 @@ func DeleteTicket(db *sql.DB, vid int64, ticket string) error {
 	return nil
 }
 
+// DeleteVulnerability will delete the vulnerability with the given vulnid from VARS.
+func DeleteVulnerability(db *sql.DB, vid int64) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete from CVEs table
+	cves, err := vars.GetCves(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, cve := range *cves {
+		err = vars.DeleteCve(tx, vid, cve)
+		if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+			return err
+		}
+	}
+
+	// Delete from Tickets table
+	tickets, err := vars.GetTickets(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, ticket := range *tickets {
+		err = vars.DeleteTicket(tx, vid, ticket)
+		if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+			return err
+		}
+	}
+
+	// Delete from Affected table
+	affected, err := vars.GetAffected(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, aff := range affected {
+		err = vars.DeleteAffected(tx, vid, aff.Sys.ID)
+		if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+			return err
+		}
+	}
+
+	// Delete from Notes table
+	notes, err := vars.GetNotes(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, note := range notes {
+		err = vars.DeleteNote(tx, note.ID)
+		if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+			return err
+		}
+	}
+
+	// Delete from Ref table
+	refs, err := vars.GetReferences(vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	for _, ref := range *refs {
+		err = vars.DeleteRef(tx, vid, ref)
+		if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+			return err
+		}
+	}
+
+	// Delete from Exploits table
+	err = vars.DeleteExploit(tx, vid)
+	if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+		return err
+	}
+
+	// Delete from Dates table
+	err = vars.DeleteDates(tx, vid)
+	if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+		return err
+	}
+
+	// Delete from Impact table
+	err = vars.DeleteImpact(tx, vid)
+	if !vars.IsNilErr(err) && !vars.IsNoRowsError(err) {
+		return err
+	}
+
+	// Delete from vuln table
+	err = vars.DeleteVulnerability(tx, vid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
 func GetActiveSystems() ([]*vars.System, error) {
 	return vars.GetActiveSystems()
