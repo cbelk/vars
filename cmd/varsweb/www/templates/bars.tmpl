@@ -46,15 +46,15 @@
 </nav>
 {{end}}
 
-{{define "nav-vuln-drop"}}
-    <button type="button" class="btn btn-dark dropdown-toggle navbar-btn navbar-left" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-        Vulnerability <span class="caret"></span>
-    </button>
-    <div class="dropdown-menu">
-        <a href="/vulnerability/all" class="text-dark text-nowrap"> All Vulnerabilities</a>
-        <a href="/vulnerability/open" class="text-dark text-nowrap"> Open Vulnerabilities</a>
-        <a href="/vulnerability/closed" class="text-dark text-nowrap"> Closed Vulnerabilities</a>
+// navbar template
+{{define "navbar-light"}}
+<nav class="navbar navbar-expand-lg fixed-top navbar-dark bg-dark">
+    <div class="container-fluid d-flex flex-row justify-content-between">
+        <a class="navbar-brand" href="/">
+            <img alt="Vulnerability Assessment Reference System" src="/images/logo.png">
+        </a>
     </div>
+</nav>
 {{end}}
 
 {% endraw %}

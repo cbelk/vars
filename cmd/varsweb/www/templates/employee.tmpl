@@ -30,7 +30,10 @@
             <button type="button" class="btn-sm btn-success" id="add-emp" data-toggle="modal" data-target="#emp-modal" data-eid="-2" aria-label="Add">
                 <span aria-hidden="true">&plus;</span>
             </button>
-            <form class="form-inline"><input type="search" id="emp-table-search" placeholder="Search by name or CVE" aria-label="Search"></form>
+            <a class="nav-link text-white" href="#" onclick="loadEmpTable('active')">Active Employees</a>
+            <a class="nav-link text-white" href="#removed" onclick="loadEmpTable('removed')">Removed Employees</a>
+            <a class="nav-link text-white" href="#all" onclick="loadEmpTable('all')">All Employees</a>
+            <form class="form-inline"><input type="search" id="emp-table-search" placeholder="Search by name or username" aria-label="Search"></form>
     </div>
 </nav>
 <div class="container-fluid pt-3 pb-3 pl-5 pr-5 vars-content">
@@ -183,8 +186,8 @@
             </div>
             </div>
             <div class="modal-footer">
-                <button type="submit" class="btn btn-dark eme-btn-submit" id="modal-add-emp-btn">Submit</button>
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-dark btn-lg btn-block eme-btn-submit" id="modal-add-emp-btn">Submit</button>
+                <button type="button" class="btn btn-danger btn-lg btn-block" id="modal-delete-emp-btn" onclick="showModalPrompt(this.id)">Delete Employee</button>
             </div>
         </div>
     </div>

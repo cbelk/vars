@@ -89,6 +89,7 @@ func main() {
 	router.GET("/session", DisplaySession)
 	router.PUT("/employee", handleEmployeeAdd)
 	router.GET("/employee", handleEmployeePage)
+	router.DELETE("/employee/:emp", handleEmployeeDelete)
 	router.GET("/employee/:emp", handleEmployees)
 	router.GET("/employee/:emp/:id", handleEmployees)
 	router.POST("/employee/:emp/:field", handleEmployeePost)
@@ -173,9 +174,26 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 	user.Authed = authed
 	session := sessionManager.Load(r)
 	if user.Authed {
+		if u == "VARSremoved" {
+			w.Header().Add("Content-Type", "text/html")
+			err := templates.Lookup("notauthorized-removed").Execute(w, nil)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+			}
+			return
+		}
 		emp, err := varsapi.GetEmployeeByUsername(u)
 		if err != nil {
+			if varsapi.IsNoRowsError(err) {
+				w.Header().Add("Content-Type", "text/html")
+				err := templates.Lookup("notauthorized-removed").Execute(w, "")
+				if err != nil {
+					http.Error(w, "Error with templating", http.StatusInternalServerError)
+				}
+				return
+			}
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		user.Emp = emp
 		err = session.PutObject(w, "user", user)
@@ -262,6 +280,54 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 						Level     int
 					}{emp.ID, emp.FirstName, emp.LastName, emp.Email, emp.UserName, emp.Level}
 					data = append(data, s)
+				}
+				err = json.NewEncoder(w).Encode(data)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			case "active":
+				emps, err := varsapi.GetEmployees()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				var data []interface{}
+				for _, emp := range emps {
+					if emp.UserName != "VARSremoved" {
+						s := struct {
+							ID        int64
+							FirstName string
+							LastName  string
+							Email     string
+							UserName  string
+							Level     int
+						}{emp.ID, emp.FirstName, emp.LastName, emp.Email, emp.UserName, emp.Level}
+						data = append(data, s)
+					}
+				}
+				err = json.NewEncoder(w).Encode(data)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			case "removed":
+				emps, err := varsapi.GetEmployees()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				var data []interface{}
+				for _, emp := range emps {
+					if emp.UserName == "VARSremoved" {
+						s := struct {
+							ID        int64
+							FirstName string
+							LastName  string
+							Email     string
+							UserName  string
+							Level     int
+						}{emp.ID, emp.FirstName, emp.LastName, emp.Email, emp.UserName, emp.Level}
+						data = append(data, s)
+					}
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
@@ -424,6 +490,29 @@ func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleEmployeeDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	e := ps.ByName("emp")
+	eid, err := strconv.Atoi(e)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if user.Authed {
+		if user.Emp.Level == AdminUser {
+			err = varsapi.DeleteEmployee(db, int64(eid))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		}

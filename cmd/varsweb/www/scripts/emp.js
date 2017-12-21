@@ -74,6 +74,7 @@ function handleAddEmp() {
     $('.eme-btn-submit').hide();
     $('.eme-pen').hide();
     $('#modal-add-emp-btn').show();
+    $('#modal-delete-emp-btn').hide();
 }
 
 function setupHover() {
@@ -130,6 +131,29 @@ function handleFuzzySearch() {
     });
 }
 
+function handlePromptChoice(btnId, choice) {
+    switch(btnId) {
+        case 'emp':
+            if (choice == 'yes') {
+                var eid = $('#emp-modal-empid').text();
+                $.ajax({
+                    method : 'DELETE',
+                    url    : '/employee/'+eid,
+                    success: function(data) {
+                        $('#emp-modal').modal('hide');
+                        $("tr[data-eid='"+eid+"']").remove();
+                    },
+                    error: function() {
+                        $('#vuln-modal-alert-danger').show();
+                        $('#vuln-modal').scrollTop(0);
+                    }
+                });
+            }
+            break;
+    }
+    hideAlerts();
+}
+
 function showModalEdit(btnID, num) {
     switch(btnID) {
         case 'emp-modal-edit-title':
@@ -179,6 +203,19 @@ function showModalEdit(btnID, num) {
     hideAlerts();
 }
 
+function showModalPrompt(btnID, num) {
+    hideAlerts();
+    switch(btnID) {
+        case 'modal-delete-emp-btn':
+            $('#emp-modal-alert-warning-item').text('Delete this employee?  ');
+            $('#emp-modal-warning-yes').attr('onclick', 'handlePromptChoice("emp", "yes")');
+            $('#emp-modal-warning-no').attr('onclick', 'handlePromptChoice("emp", "no")');
+            $('#emp-modal-alert-warning').show();
+            break;
+    }
+    $('#emp-modal').scrollTop(0);
+}
+
 $('#emp-modal').on('show.bs.modal', function (event) {
     // Get empid
     var row = $(event.relatedTarget);
@@ -191,6 +228,7 @@ $('#emp-modal').on('show.bs.modal', function (event) {
         req.onreadystatechange = function() {
             if(this.readyState == 4 && this.status == 200) {
                 var emp = JSON.parse(this.responseText);
+                modal.find('#modal-delete-emp-btn').show();
                 modal.find('#emp-modal-fname').val(emp.FirstName);
                 modal.find('#emp-modal-lname').val(emp.LastName);
                 modal.find('#emp-modal-empid').text(emp.ID);
@@ -201,6 +239,9 @@ $('#emp-modal').on('show.bs.modal', function (event) {
                 hideAlerts();
                 setupHover();
                 $('.eme-btn').hide();
+                if (emp.UserName == "VARSremoved") {
+                    modal.find('#modal-delete-emp-btn').hide();
+                }
             }
         };
         req.open('GET', '/employee/' + eid, true);
@@ -216,12 +257,12 @@ $('#emp-modal').on('hidden.bs.modal', function (event) {
     $('#emp-modal-empid').text('-1');
 });
 
-function loadEmpTable() {
+function loadEmpTable(state) {
     $('#emp-table tbody').empty();
     $.ajax({
         method  : 'GET',
         dataType: 'json',
-        url     : '/employee/all',
+        url     : '/employee/'+state,
         success : function(data) {
             if (data != null) {
                 for (i=0; i < data.length; i++) {
@@ -356,5 +397,14 @@ $(document).ready(function() {
     $('#emp-table-search').keyup(function() {
         handleFuzzySearch();
     });
-    loadEmpTable();
+    var state = window.location.hash.replace('#', '').trim();
+    switch(state) {
+        case 'all':
+        case 'removed':
+            loadEmpTable(state);
+            break;
+        default:
+            loadEmpTable('active');
+            break;
+    }
 });

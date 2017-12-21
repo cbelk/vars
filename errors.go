@@ -21,6 +21,7 @@
 package vars
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -116,7 +117,7 @@ func IsNameNotAvailableError(err error) bool {
 
 // IsNoRowsError returns true if the error is caused by no rows being effected
 func (e Err) IsNoRowsError() bool {
-	if e.err.Error() == ErrNoRowsInserted.Error() || e.err.Error() == ErrNoRowsUpdated.Error() {
+	if e.err.Error() == ErrNoRowsInserted.Error() || e.err.Error() == ErrNoRowsUpdated.Error() || e.err.Error() == sql.ErrNoRows.Error() {
 		return true
 	}
 	return false

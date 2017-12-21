@@ -493,6 +493,33 @@ func DeleteCve(db *sql.DB, vid int64, cve string) error {
 	return nil
 }
 
+// DeleteEmployee will change the username of the row with empid to 'removed'.
+func DeleteEmployee(db *sql.DB, eid int64) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateEmpUname(tx, eid, "VARSremoved")
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // DeleteNote deletes the note with the given noteid.
 func DeleteNote(db *sql.DB, nid int64) error {
 	//Start transaction and set rollback function
