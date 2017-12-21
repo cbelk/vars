@@ -90,6 +90,7 @@ func main() {
 	router.PUT("/employee", handleEmployeeAdd)
 	router.GET("/employee", handleEmployeePage)
 	router.GET("/employee/:emp", handleEmployees)
+	router.GET("/employee/:emp/:id", handleEmployees)
 	router.POST("/employee/:emp/:field", handleEmployeePost)
 	router.GET("/notes/:vuln", handleNotes)
 	router.POST("/notes/:noteid", handleNotesPost)
@@ -153,7 +154,7 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		http.Redirect(w, r, "/", http.StatusFound)
 	} else {
 		w.Header().Add("Content-Type", "text/html")
-		err := templates.Lookup("login").Execute(w, nil)
+		err := templates.Lookup("login").Execute(w, "login")
 		if err != nil {
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
 		}
@@ -187,7 +188,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		err := templates.Lookup("login-failed").Execute(w, nil)
+		err := templates.Lookup("login-failed").Execute(w, "login")
 		if err != nil {
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
 		}
@@ -267,6 +268,47 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
+			case "list":
+				emps, err := varsapi.GetEmployees()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				var data []interface{}
+				for _, emp := range emps {
+					name := fmt.Sprintf("%s %s", emp.FirstName, emp.LastName)
+					s := struct {
+						ID   int64
+						Name string
+					}{emp.ID, name}
+					data = append(data, s)
+				}
+				err = json.NewEncoder(w).Encode(data)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			case "name":
+				i := ps.ByName("id")
+				eid, err := strconv.Atoi(i)
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				emp, err := varsapi.GetEmployeeByID(int64(eid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				name := fmt.Sprintf("%s %s", emp.FirstName, emp.LastName)
+				s := struct {
+					Name string
+				}{name}
+				err = json.NewEncoder(w).Encode(s)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
 			default:
 				eid, err := strconv.Atoi(e)
 				if err != nil {
@@ -283,6 +325,57 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
+			}
+		} else if user.Emp.Level == PrivilegedUser || user.Emp.Level == StandardUser {
+			if e == "name" {
+				i := ps.ByName("id")
+				eid, err := strconv.Atoi(i)
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				emp, err := varsapi.GetEmployeeByID(int64(eid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				name := fmt.Sprintf("%s %s", emp.FirstName, emp.LastName)
+				s := struct {
+					Name string
+				}{name}
+				err = json.NewEncoder(w).Encode(s)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			} else if e == "list" {
+				if user.Emp.Level == PrivilegedUser {
+					emps, err := varsapi.GetEmployees()
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					var data []interface{}
+					for _, emp := range emps {
+						name := fmt.Sprintf("%s %s", emp.FirstName, emp.LastName)
+						s := struct {
+							ID   int64
+							Name string
+						}{emp.ID, name}
+						data = append(data, s)
+					}
+					err = json.NewEncoder(w).Encode(data)
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+				} else {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+			} else {
+				w.WriteHeader(http.StatusTeapot)
+				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
@@ -1112,6 +1205,23 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 						w.WriteHeader(http.StatusOK)
 					}
 				}
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "finder":
+			if user.Emp.Level <= PrivilegedUser {
+				finder := r.FormValue("finder")
+				eid, err := strconv.Atoi(finder)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				err = varsapi.UpdateFinder(db, int64(vid), int64(eid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}

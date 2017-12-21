@@ -1618,6 +1618,32 @@ func UpdateCves(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
 	return nil
 }
 
+// UpdateFinder will update the finder's empid associated with the vulnid
+func UpdateFinder(db *sql.DB, vid, eid int64) error {
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateFinder(tx, vid, eid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // UpdateReference will update the reference associated with row (vid, oldRef) to newRef.
 func UpdateReference(db *sql.DB, vid int64, oldRef, newRef string) error {
 	// Start transaction and set rollback function

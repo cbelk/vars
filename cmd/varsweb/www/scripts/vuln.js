@@ -47,6 +47,7 @@ function hideModalEdit() {
     $('#vuln-modal-test').attr('readonly', true);
     $('#vuln-modal-test').addClass('form-control-plaintext');
     $('#vuln-modal-test').removeClass('form-control');
+    $('#vuln-modal-finder').attr('disabled', true);
     $('#vuln-modal-mitigation').attr('readonly', true);
     $('#vuln-modal-mitigation').addClass('form-control-plaintext');
     $('#vuln-modal-mitigation').removeClass('form-control');
@@ -129,70 +130,66 @@ function setupHover() {
             $('.vme-btn-title-submit').hide();
         }
     );
-
     $('#vuln-modal-section-summary').hover(function() {
             $('.vme-btn-summary').show();
         }, function() {
             $('.vme-btn-summary').hide();
         }
     );
-
     $('#vuln-modal-section-cve').hover(function() {
             $('.vme-btn-cve').show();
         }, function() {
             $('.vme-btn-cve').hide();
         }
     );
-
     $('#vuln-modal-section-cvss').hover(function() {
             $('.vme-btn-cvss').show();
         }, function() {
             $('.vme-btn-cvss').hide();
         }
     );
-
     $('#vuln-modal-section-corpscore').hover(function() {
             $('.vme-btn-corpscore').show();
         }, function() {
             $('.vme-btn-corpscore').hide();
         }
     );
-
     $('#vuln-modal-section-test').hover(function() {
             $('.vme-btn-test').show();
         }, function() {
             $('.vme-btn-test').hide();
         }
     );
-
+    $('#vuln-modal-section-finder').hover(function() {
+            $('.vme-btn-finder').show();
+        }, function() {
+            $('.vme-btn-finder').hide();
+        }
+    );
     $('#vuln-modal-section-mitigation').hover(function() {
             $('.vme-btn-mitigation').show();
         }, function() {
             $('.vme-btn-mitigation').hide();
         }
     );
-
     $('#vuln-modal-section-tickets').hover(function() {
             $('.vme-btn-ticket').show();
         }, function() {
             $('.vme-btn-ticket').hide();
         }
     );
-
     $('#vuln-modal-section-refs').hover(function() {
             $('.vme-btn-ref').show();
         }, function() {
             $('.vme-btn-ref').hide();
         }
     );
-
     $('#vuln-modal-section-exploitable').hover(function() {
             $('.vme-btn-exploitable').show();
         }, function() {
             $('.vme-btn-exploitable').hide();
         }
     );
-
     $('#vuln-modal-section-exploit').hover(function() {
             $('.vme-btn-exploit').show();
         }, function() {
@@ -207,6 +204,7 @@ function unbindHover() {
     $('#vuln-modal-section-cvss').unbind('mouseenter mouseleave');
     $('#vuln-modal-section-corpscore').unbind('mouseenter mouseleave');
     $('#vuln-modal-section-test').unbind('mouseenter mouseleave');
+    $('#vuln-modal-section-finder').unbind('mouseenter mouseleave');
     $('#vuln-modal-section-mitigation').unbind('mouseenter mouseleave');
     $('#vuln-modal-section-tickets').unbind('mouseenter mouseleave');
     $('#vuln-modal-section-refs').unbind('mouseenter mouseleave');
@@ -365,6 +363,14 @@ function showModalEdit(btnID, num) {
                 $('#vuln-modal-mitigation').removeClass('form-control-plaintext');
                 $('#vuln-modal-mitigation').addClass('form-control');
                 $('#vuln-modal-form-mitigation button').show();
+            } else {
+                hideModalEdit();
+            }
+            break;
+        case 'vuln-modal-edit-finder':
+            if ($('#vuln-modal-finder').is('[disabled]')) {
+                $('#vuln-modal-finder').attr('disabled', false);
+                $('#vuln-modal-form-finder button').show();
             } else {
                 hideModalEdit();
             }
@@ -648,6 +654,56 @@ function handlePromptChoice(btnId, choice, item, itemID) {
     hideAlerts();
 }
 
+function appendInitiator(vuln) {
+    $.ajax({
+        method  : 'GET',
+        url     : '/employee/name/'+vuln.Initiator,
+        dataType: 'json',
+        success : function(data) {
+            $('#vuln-modal-initiator').text(data.Name);
+        },
+        error: function() {
+            alert('Error retrieving employee name');
+        }
+    });
+}
+
+function appendFinder(vuln) {
+    $.ajax({
+        method  : 'GET',
+        url     : '/employee/name/'+vuln.Finder,
+        dataType: 'json',
+        success : function(data) {
+            $('#vuln-modal-finder').empty();
+            $('#vuln-modal-finder').append('<option selected>'+data.Name+'</option>');
+        },
+        error: function() {
+            alert('Error retrieving employee name');
+        }
+    });
+}
+
+function appendFinderList(vuln) {
+    $.ajax({
+        method  : 'GET',
+        url     : '/employee/list',
+        dataType: 'json',
+        success : function(data) {
+            $('#vuln-modal-finder').empty();
+            for (i=0; i < data.length; i++) {
+                if (vuln.Finder == data[i].ID) {
+                    $('#vuln-modal-finder').append('<option value="'+data[i].ID+'" selected>'+data[i].Name+'</option>');
+                } else {
+                    $('#vuln-modal-finder').append('<option value="'+data[i].ID+'">'+data[i].Name+'</option>');
+                }
+            }
+        },
+        error: function() {
+            alert('Error retrieving employee list');
+        }
+    });
+}
+
 function appendCve(cve, num) {
     $('#vuln-modal-cve-list').append('<div class="row justify-content-start" id="vuln-modal-div-cve-'+num+'"> <div class="col-1"> <div class="btn-group" role="group"><button type="button" class="btn-sm bg-white text-success border-0 vme-btn vme-btn-cve" id="vuln-modal-edit-cve-' + num + '-btn" data-edit-btn-group="cve" onclick="showModalEdit(\'cve\','+num+')" aria-label="Edit"> <span aria-hidden="true">&#9998;</span> </button> <button type="button" class="btn-sm bg-white text-danger border-0 vme-btn vme-btn-cve" id="vuln-modal-delete-cve-' + num + '-btn" data-delete-btn-group="cve" onclick="showModalDelete(\'cve\','+num+')" aria-label="Delete"> <span aria-hidden="true">&times;</span> </button></div> </div> <div class="col-11"> <form class="form-inline" id="vuln-modal-form-cve-'+num+'"> <input type="text" class="form-control-plaintext edit-cve-input" readonly id="vuln-modal-edit-cve-' + num + '"value="' + cve + '" name="cve" data-original="'+cve+'"><button type="submit" class="btn btn-dark vme-btn-submit" id="vuln-modal-edit-cve-'+num+'-submit">Submit</button></form></div></div>');
     $('#vuln-modal-form-cve-'+num).on('submit', {cveid: num}, function(event) {
@@ -809,6 +865,15 @@ function updateVulnModal(vuln, modal) {
     modal.find('#vuln-modal-test').val(vuln.Test);
     // Mitigation
     modal.find('#vuln-modal-mitigation').val(vuln.Mitigation);
+    // Finder
+    if ($('#vuln-modal-finder').is('[data-editable]')) {
+        appendFinderList(vuln);
+    } else {
+        appendFinder(vuln);
+    }
+    // Initiator
+    modal.find('#vuln-modal-initiator').text('');
+    appendInitiator(vuln);
     // Initiated
     modal.find('#vuln-modal-initiated').text(vuln.Dates.Initiated);
     // Mitigated
@@ -1131,6 +1196,25 @@ $(document).ready(function() {
                 $('#vuln-modal').scrollTop(0);
                 var refID = $('#vuln-modal-ref-list').children().length - 1;
                 appendRef(ref, refID);
+                hideModalEdit();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#vuln-modal-form-finder').on('submit', function(event) {
+		event.preventDefault();
+		var fdata = $('#vuln-modal-form-finder').serialize();
+		var vid = $('#vuln-modal-vulnid').text();
+		$.ajax({
+			method : 'POST',
+			url    : '/vulnerability/'+vid+'/finder',
+			data   : fdata,
+			success: function(data) {
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
                 hideModalEdit();
 			},
             error: function() {
