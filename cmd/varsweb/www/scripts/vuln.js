@@ -68,6 +68,19 @@ function hideModalEdit() {
     $('.vme-div-ref').hide();
 }
 
+function undoAddHides() {
+    $('#vuln-modal-div-cvss').show();
+    $('#vuln-modal-notes').show();
+    $('#vuln-modal-affected').show();
+    $('#vuln-modal-section-refs').show();
+    $('#vuln-modal-section-tickets').show();
+    $('#vuln-modal-section-cve').show();
+    $('#vuln-modal-section-date-opened').show();
+    $('#vuln-modal-section-date-closed').show();
+    $('#modal-close-vuln-btn').show();
+    $('#modal-reopen-vuln-btn').show();
+}
+
 function handleAddVuln() {
     hideModalEdit();
     hideAlerts();
@@ -118,6 +131,8 @@ function handleAddVuln() {
     $('#vuln-modal-section-date-closed').hide();
     $('.vme-btn-submit').hide();
     $('.vme-pen').hide();
+    $('#modal-close-vuln-btn').hide();
+    $('#modal-reopen-vuln-btn').hide();
     $('#modal-add-vuln-btn').show();
 }
 
@@ -881,8 +896,10 @@ function updateVulnModal(vuln, modal) {
     // Mitigated
     if (vuln.Dates.Mitigated == null) {
         modal.find('#vuln-modal-mitigated').text('');
+        modal.find('#modal-reopen-vuln-btn').hide();
     } else {
         modal.find('#vuln-modal-mitigated').text(vuln.Dates.Mitigated);
+        modal.find('#modal-close-vuln-btn').hide();
     }
     // Tickets
     modal.find('#vuln-modal-ticket-list').empty();
@@ -951,6 +968,7 @@ $('#vuln-modal').on('show.bs.modal', function (event) {
         req.onreadystatechange = function() {
             if(this.readyState == 4 && this.status == 200) {
                 var vuln = JSON.parse(this.responseText);
+                undoAddHides();
                 updateVulnModal(vuln, modal);
                 hideModalEdit();
                 hideAlerts();
@@ -1313,6 +1331,42 @@ $(document).ready(function() {
                 $('#vuln-modal').scrollTop(0);
                 appendNotes(vid);
                 $('#vuln-modal-add-note').val('');
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#modal-close-vuln-btn').on('click', function(event) {
+		event.preventDefault();
+		var vid   = $('#vuln-modal-vulnid').text();
+		$.ajax({
+			method : 'PUT',
+			url    : '/vulnerability/'+vid+'/mitigated',
+			success: function(data) {
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
+				$("tr[data-vid='"+vid+"']").hide();
+                $('#modal-close-vuln-btn').hide();
+			},
+            error: function() {
+                $('#vuln-modal-alert-danger').show();
+                $('#vuln-modal').scrollTop(0);
+            }
+		});
+	});
+	$('#modal-reopen-vuln-btn').on('click', function(event) {
+		event.preventDefault();
+		var vid   = $('#vuln-modal-vulnid').text();
+		$.ajax({
+			method : 'DELETE',
+			url    : '/vulnerability/'+vid+'/mitigated',
+			success: function(data) {
+				$('#vuln-modal-alert-success').show();
+                $('#vuln-modal').scrollTop(0);
+				$("tr[data-vid='"+vid+"']").hide();
+                $('#modal-reopen-vuln-btn').hide();
 			},
             error: function() {
                 $('#vuln-modal-alert-danger').show();

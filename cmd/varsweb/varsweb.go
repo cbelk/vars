@@ -1013,6 +1013,17 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
+		case "mitigated":
+			if user.Emp.Level <= PrivilegedUser {
+				err := varsapi.CloseVulnerability(db, int64(vid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		default:
 			w.WriteHeader(http.StatusTeapot)
 			return
@@ -1112,6 +1123,17 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 					return
 				}
 				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "mitigated":
+			if user.Emp.Level <= PrivilegedUser {
+				err := varsapi.ReopenVulnerability(db, int64(vid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
 			}

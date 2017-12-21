@@ -343,6 +343,34 @@ func AddVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 	return nil
 }
 
+// ReopenVulnerability sets the 'mitigated' date to a null date for the given vulnid.
+func ReopenVulnerability(db *sql.DB, vid int64) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	date := vars.VarsNullTime{pq.NullTime{Time: time.Now(), Valid: false}}
+	err = vars.UpdateMitDate(tx, vid, date)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
 // CloseVulnerability sets the 'mitigated' date equal to the date parameter for the given vulnid.
 func CloseVulnerability(db *sql.DB, vid int64) error {
 	//Start transaction and set rollback function
