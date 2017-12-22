@@ -95,7 +95,11 @@ func main() {
 	router.POST("/employee/:emp/:field", handleEmployeePost)
 	router.GET("/notes/:vuln", handleNotes)
 	router.POST("/notes/:noteid", handleNotesPost)
-	router.GET("/systems/:sys", handleSystems)
+	router.PUT("/system", handleSystemAdd)
+	router.GET("/system", handleSystemPage)
+	router.GET("/system/:sys", handleSystems)
+	router.DELETE("/system/:sys", handleSystemDelete)
+	router.POST("/system/:sys/:field", handleSystemPost)
 	router.PUT("/vulnerability", handleVulnerabilityAdd)
 	router.GET("/vulnerability", handleVulnerabilityPage)
 	router.GET("/vulnerability/:vuln", handleVulnerabilities)
@@ -688,6 +692,110 @@ func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	}
 }
 
+// handleSystemAdd adds the new system to VARS
+func handleSystemAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level <= StandardUser {
+			name := r.FormValue("name")
+			tp := r.FormValue("type")
+			opsys := r.FormValue("os")
+			loc := r.FormValue("location")
+			desc := r.FormValue("description")
+			sys := varsapi.CreateSystem(name, tp, opsys, loc, desc, "active")
+			err = varsapi.AddSystem(db, sys)
+			if err != nil {
+				if varsapi.IsNameNotAvailableError(err) {
+					w.WriteHeader(http.StatusNotAcceptable)
+					return
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			ist := struct {
+				ID int64
+			}{sys.ID}
+			err = json.NewEncoder(w).Encode(ist)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+// handleSystemPage serves the system page outline
+func handleSystemPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level <= StandardUser {
+			s := struct {
+				Page string
+				User interface{}
+			}{"sys", user}
+			w.Header().Add("Content-Type", "text/html")
+			err := templates.Lookup("sys").Execute(w, s)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			err := templates.Lookup("notauthorized-get").Execute(w, user)
+			if err != nil {
+				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleSystemDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	s := ps.ByName("sys")
+	sid, err := strconv.Atoi(s)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		if user.Emp.Level <= PrivilegedUser {
+			err = varsapi.DeleteSystem(db, int64(sid))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
 func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user, err := getSession(r)
 	if err != nil {
@@ -707,8 +815,8 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-			case "active":
-				syss, err := varsapi.GetActiveSystems()
+			case "active", "inactive":
+				syss, err := varsapi.GetSystemsByState(s)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
@@ -718,8 +826,21 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 					return
 				}
 			default:
-				w.WriteHeader(http.StatusNotFound)
-				return
+				sid, err := strconv.Atoi(s)
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				sys, err := varsapi.GetSystem(int64(sid))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				err = json.NewEncoder(w).Encode(sys)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
@@ -729,6 +850,112 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	s := ps.ByName("sys")
+	sid, err := strconv.Atoi(s)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	field := ps.ByName("field")
+	if user.Authed {
+		switch field {
+		case "name":
+			if user.Emp.Level <= StandardUser {
+				name := r.FormValue("name")
+				err := varsapi.UpdateSystemName(db, int64(sid), name)
+				if err != nil {
+					if varsapi.IsNameNotAvailableError(err) {
+						w.WriteHeader(http.StatusNotAcceptable)
+						return
+					}
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "type":
+			if user.Emp.Level <= StandardUser {
+				tp := r.FormValue("type")
+				err := varsapi.UpdateSystemType(db, int64(sid), tp)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "os":
+			if user.Emp.Level <= StandardUser {
+				opsys := r.FormValue("os")
+				err := varsapi.UpdateSystemOS(db, int64(sid), opsys)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "location":
+			if user.Emp.Level <= StandardUser {
+				loc := r.FormValue("location")
+				err := varsapi.UpdateSystemLocation(db, int64(sid), loc)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "description":
+			if user.Emp.Level <= StandardUser {
+				desc := r.FormValue("description")
+				err := varsapi.UpdateSystemDescription(db, int64(sid), desc)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		case "state":
+			if user.Emp.Level <= StandardUser {
+				state := r.FormValue("state")
+				if state != "active" && state != "inactive" {
+					w.WriteHeader(http.StatusNotAcceptable)
+					return
+				}
+				err := varsapi.UpdateSystemState(db, int64(sid), state)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			w.WriteHeader(http.StatusTeapot)
+			return
+		}
 	}
 }
 

@@ -257,6 +257,12 @@ func CreateEmployee(firstname, lastname, email, username string, level int) *var
 	return &emp
 }
 
+// CreateSystem creates a system object with the given parameters.
+func CreateSystem(name, tp, opsys, loc, desc, state string) *vars.System {
+	sys := vars.System{Name: name, Type: tp, OpSys: opsys, Location: loc, Description: desc, State: state}
+	return &sys
+}
+
 // CreateVulnerability creates a vulnerability object with the given parameters.
 func CreateVulnerability(name, summary, cvssLink, test, mitigation, exploit string, exploitable bool, cvss, corpscore float32) *vars.Vulnerability {
 	vuln := vars.Vulnerability{Name: name, Cvss: cvss, CorpScore: corpscore, CvssLink: GetVarsNullString(cvssLink), Summary: summary, Test: test, Mitigation: mitigation, Exploit: GetVarsNullString(exploit), Exploitable: GetVarsNullBool(exploitable)}
@@ -410,34 +416,6 @@ func ConnectDB() (*sql.DB, error) {
 	return vars.ConnectDB(&conf)
 }
 
-// DecommissionSystem sets the state of the given system to decommissioned.
-func DecommissionSystem(db *sql.DB, sys *vars.System) error {
-	//Start transaction and set rollback function
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	rollback := true
-	defer func() {
-		if rollback {
-			tx.Rollback()
-		}
-	}()
-
-	// Decommission system
-	err = vars.UpdateSysState(tx, sys.ID, "decommissioned")
-	if !vars.IsNilErr(err) {
-		return err
-	}
-
-	// Commit the transaction
-	rollback = false
-	if e := tx.Commit(); e != nil {
-		return e
-	}
-	return nil
-}
-
 // DeleteAffected deletes the row (vid, sid) from affected.
 func DeleteAffected(db *sql.DB, vid, sid int64) error {
 	//Start transaction and set rollback function
@@ -563,6 +541,38 @@ func DeleteRef(db *sql.DB, vid int64, ref string) error {
 	}()
 
 	err = vars.DeleteRef(tx, vid, ref)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// DeleteSystem will delete the row in the sys table associated with sid.
+func DeleteSystem(db *sql.DB, sid int64) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.DeleteSystemFromAffected(tx, sid)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	err = vars.DeleteSystem(tx, sid)
 	if !vars.IsNilErr(err) {
 		return err
 	}
@@ -708,11 +718,6 @@ func DeleteVulnerability(db *sql.DB, vid int64) error {
 	return nil
 }
 
-// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
-func GetActiveSystems() ([]*vars.System, error) {
-	return vars.GetActiveSystems()
-}
-
 // GetEmployeeByID returns an Employee object with the given empid.
 func GetEmployeeByID(eid int64) (*vars.Employee, error) {
 	return vars.GetEmployee(eid)
@@ -810,6 +815,11 @@ func GetSystemByName(name string) (*vars.System, error) {
 		return &s, err
 	}
 	return vars.GetSystem(id)
+}
+
+// GetSystemsByState retrieves/returns the systems with the given state.
+func GetSystemsByState(state string) ([]*vars.System, error) {
+	return vars.GetSystemsByState(state)
 }
 
 // GetSystems retrieves/returns a slice of pointers to all System objects.
@@ -1325,82 +1335,6 @@ func UpdateNote(db *sql.DB, noteid int64, note string) error {
 	return nil
 }
 
-// UpdateSystem updates the edited parts of the system
-func UpdateSystem(db *sql.DB, sys *vars.System) error {
-	// Get the old system
-	old, err := vars.GetSystem(sys.ID)
-	if !vars.IsNilErr(err) {
-		return err
-	}
-
-	// Start transaction and set rollback function
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	rollback := true
-	defer func() {
-		if rollback {
-			tx.Rollback()
-		}
-	}()
-
-	// Compare old system object to new system object and update appropriate parts
-	if old.Name != sys.Name {
-		// Check new name
-		a, err := vars.NameIsAvailable("sys", sys.Name)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-		if !a {
-			return vars.ErrNameNotAvailable
-		}
-
-		// Update name
-		err = vars.UpdateSysName(tx, sys.ID, sys.Name)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-	if old.Type != sys.Type {
-		err = vars.UpdateSysType(tx, sys.ID, sys.Type)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-	if old.OpSys != sys.OpSys {
-		err = vars.UpdateSysOS(tx, sys.ID, sys.OpSys)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-	if old.Location != sys.Location {
-		err = vars.UpdateSysLoc(tx, sys.ID, sys.Location)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-	if old.Description != sys.Description {
-		err = vars.UpdateSysDesc(tx, sys.ID, sys.Description)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-	if old.State != sys.State {
-		err = vars.UpdateSysState(tx, sys.ID, sys.State)
-		if !vars.IsNilErr(err) {
-			return err
-		}
-	}
-
-	// Commit the transaction
-	rollback = false
-	if e := tx.Commit(); e != nil {
-		return e
-	}
-	return nil
-}
-
 // UpdateVulnerabilityMitigation will update the mitigation associated with the given vulnid.
 func UpdateVulnerabilityMitigation(db *sql.DB, vid int64, mitigation string) error {
 	// Start transaction and set rollback function
@@ -1846,6 +1780,253 @@ func UpdateReferences(tx *sql.Tx, old, vuln *vars.Vulnerability) error {
 		if !vars.IsNilErr(err) {
 			return err
 		}
+	}
+	return nil
+}
+
+// UpdateSystem updates the edited parts of the system
+func UpdateSystem(db *sql.DB, sys *vars.System) error {
+	// Get the old system
+	old, err := vars.GetSystem(sys.ID)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	// Compare old system object to new system object and update appropriate parts
+	if old.Name != sys.Name {
+		// Check new name
+		a, err := vars.NameIsAvailable("sys", sys.Name)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+		if !a {
+			return vars.ErrNameNotAvailable
+		}
+
+		// Update name
+		err = vars.UpdateSysName(tx, sys.ID, sys.Name)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Type != sys.Type {
+		err = vars.UpdateSysType(tx, sys.ID, sys.Type)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.OpSys != sys.OpSys {
+		err = vars.UpdateSysOS(tx, sys.ID, sys.OpSys)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Location != sys.Location {
+		err = vars.UpdateSysLoc(tx, sys.ID, sys.Location)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.Description != sys.Description {
+		err = vars.UpdateSysDesc(tx, sys.ID, sys.Description)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+	if old.State != sys.State {
+		err = vars.UpdateSysState(tx, sys.ID, sys.State)
+		if !vars.IsNilErr(err) {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemDescription updates the description of the given system.
+func UpdateSystemDescription(db *sql.DB, sid int64, desc string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysDesc(tx, sid, desc)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemLocation updates the location of the given system.
+func UpdateSystemLocation(db *sql.DB, sid int64, loc string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysLoc(tx, sid, loc)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemName updates the name associated with the sysid.
+func UpdateSystemName(db *sql.DB, sid int64, name string) error {
+	// Check if name is available
+	a, err := vars.NameIsAvailable("sys", name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+	if !a {
+		return vars.ErrNameNotAvailable
+	}
+
+	// Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysName(tx, sid, name)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemOS updates the operating system of the given system.
+func UpdateSystemOS(db *sql.DB, sid int64, opsys string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysOS(tx, sid, opsys)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemState sets the state of the given system to 'state'.
+func UpdateSystemState(db *sql.DB, sid int64, state string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysState(tx, sid, state)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
+	}
+	return nil
+}
+
+// UpdateSystemType updates the type of system.
+func UpdateSystemType(db *sql.DB, sid int64, tp string) error {
+	//Start transaction and set rollback function
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			tx.Rollback()
+		}
+	}()
+
+	err = vars.UpdateSysType(tx, sid, tp)
+	if !vars.IsNilErr(err) {
+		return err
+	}
+
+	// Commit the transaction
+	rollback = false
+	if e := tx.Commit(); e != nil {
+		return e
 	}
 	return nil
 }

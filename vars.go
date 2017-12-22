@@ -30,8 +30,7 @@ import (
 type sqlStatement int
 
 const (
-	ssActiveSystems sqlStatement = iota
-	ssCheckVulnName
+	ssCheckVulnName sqlStatement = iota
 	ssCheckSysName
 	ssDeleteAffected
 	ssDeleteCve
@@ -40,6 +39,8 @@ const (
 	ssDeleteImpact
 	ssDeleteNote
 	ssDeleteRef
+	ssDeleteSys
+	ssDeleteSysA
 	ssDeleteTicket
 	ssDeleteVuln
 	ssGetAffected
@@ -56,6 +57,7 @@ const (
 	ssGetReferences
 	ssGetSystem
 	ssGetSystems
+	ssGetSystemsByState
 	ssGetSystemID
 	ssGetTickets
 	ssGetVuln
@@ -109,7 +111,6 @@ const (
 var (
 	queries      map[sqlStatement]*sql.Stmt
 	queryStrings = map[sqlStatement]string{
-		ssActiveSystems:     "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems WHERE state='active';",
 		ssCheckVulnName:     "SELECT vulnid FROM vuln WHERE vulnname=$1;",
 		ssCheckSysName:      "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssDeleteAffected:    "DELETE FROM affected WHERE vulnid=$1 AND sysid=$2;",
@@ -119,6 +120,8 @@ var (
 		ssDeleteImpact:      "DELETE FROM impact WHERE vulnid=$1;",
 		ssDeleteNote:        "DELETE FROM notes WHERE noteid=$1;",
 		ssDeleteRef:         "DELETE FROM ref WHERE vulnid=$1 AND url=$2;",
+		ssDeleteSys:         "DELETE FROM systems WHERE sysid=$1;",
+		ssDeleteSysA:        "DELETE FROM affected WHERE sysid=$1;",
 		ssDeleteTicket:      "DELETE FROM tickets WHERE vulnid=$1 AND ticket=$2;",
 		ssDeleteVuln:        "DELETE FROM vuln WHERE vulnid=$1;",
 		ssGetAffected:       "SELECT sysid, mitigated FROM affected WHERE vulnid=$1;",
@@ -135,6 +138,7 @@ var (
 		ssGetReferences:     "SELECT url FROM ref WHERE vulnid=$1;",
 		ssGetSystem:         "SELECT sysname, systype, opsys, location, description, state FROM systems WHERE sysid=$1;",
 		ssGetSystems:        "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems;",
+		ssGetSystemsByState: "SELECT sysid, sysname, systype, opsys, location, description, state FROM systems WHERE state=$1;",
 		ssGetSystemID:       "SELECT sysid FROM systems WHERE sysname=$1;",
 		ssGetTickets:        "SELECT ticket FROM tickets WHERE vulnid=$1;",
 		ssGetVuln:           "SELECT vulnname, finder, initiator, summary, test, mitigation FROM vuln WHERE vulnid=$1;",
@@ -184,7 +188,6 @@ var (
 		ssUpdateVulnName:    "UPDATE vuln SET vulnname=$1 WHERE vulnid=$2;",
 	}
 	execNames = map[sqlStatement]string{
-		ssActiveSystems:     "GetActiveSystems",
 		ssDeleteAffected:    "DeleteAffected",
 		ssDeleteCve:         "DeleteCve",
 		ssDeleteDates:       "DeleteDates",
@@ -192,6 +195,8 @@ var (
 		ssDeleteImpact:      "DeleteImpact",
 		ssDeleteNote:        "DeleteNote",
 		ssDeleteRef:         "DeleteRef",
+		ssDeleteSys:         "DeleteSystem",
+		ssDeleteSysA:        "DeleteSystemFromAffected",
 		ssDeleteTicket:      "DeleteTicket",
 		ssDeleteVuln:        "DeleteVulnerability",
 		ssGetAffected:       "GetAffected",
@@ -208,6 +213,7 @@ var (
 		ssGetReferences:     "GetReferences",
 		ssGetSystem:         "GetSystem",
 		ssGetSystems:        "GetSystems",
+		ssGetSystemsByState: "GetSystemsByState",
 		ssGetSystemID:       "GetSystemID",
 		ssGetTickets:        "GetTickets",
 		ssGetVuln:           "GetVulnerability",
@@ -290,7 +296,7 @@ type System struct {
 	OpSys       string
 	Location    string // Corporate, hosted, etc
 	Description string
-	State       string // Active or decommissioned
+	State       string // Active or inactive
 }
 
 // VulnDates holds the different dates relating to the vulnerability.
@@ -356,6 +362,16 @@ func DeleteRef(tx *sql.Tx, vid int64, ref string) Err {
 	return execMutation(tx, ssDeleteRef, vid, ref)
 }
 
+// DeleteSystem deletes the row in the systems table with the given sysid.
+func DeleteSystem(tx *sql.Tx, sid int64) Err {
+	return execMutation(tx, ssDeleteSys, sid)
+}
+
+// DeleteSystemFromAffected deletes the rows in the affected table with the given sysid.
+func DeleteSystemFromAffected(tx *sql.Tx, sid int64) Err {
+	return execMutation(tx, ssDeleteSysA, sid)
+}
+
 // DeleteTicket deletes the row in the tickets table with the given vulnid and ticket.
 func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 	return execMutation(tx, ssDeleteTicket, vid, ticket)
@@ -364,11 +380,6 @@ func DeleteTicket(tx *sql.Tx, vid int64, ticket string) Err {
 // DeleteVulnerability deletes the row in the vuln table with the given vulnid.
 func DeleteVulnerability(tx *sql.Tx, vid int64) Err {
 	return execMutation(tx, ssDeleteVuln, vid)
-}
-
-// GetActiveSystems returns a pointer to a slice of System types representing the systems that are currently active.
-func GetActiveSystems() ([]*System, error) {
-	return execGetRowsSys(ssActiveSystems)
 }
 
 // GetAffected returns a slice of pointers to Affected objects.
@@ -550,6 +561,11 @@ func GetSystem(sid int64) (*System, error) {
 // GetSystems returns a pointer to a slice of System types representing all systems.
 func GetSystems() ([]*System, error) {
 	return execGetRowsSys(ssGetSystems)
+}
+
+// GetSystemsByState returns a pointer to a slice of System types representing the systems that are currently 'state'.
+func GetSystemsByState(state string) ([]*System, error) {
+	return execGetRowsSys(ssGetSystemsByState, state)
 }
 
 // GetSystemID returns the sysid associated with the sysname.

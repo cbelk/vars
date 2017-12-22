@@ -30,12 +30,15 @@
         {{if .Authed}}
         <ul class="navbar-nav mr-auto">
             {{if le .Emp.Level 2}}
-            <li class="nav-item active">
+            <li class="nav-item">
                 <a class="nav-link" href="/vulnerability">Vulnerability</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/system">System</a>
             </li>
             {{end}}
             {{if eq .Emp.Level 0}}
-            <li class="nav-item active">
+            <li class="nav-item">
                 <a class="nav-link" href="/employee">Employee</a>
             </li>
             {{end}}
