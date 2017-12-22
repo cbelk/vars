@@ -91,3 +91,7 @@ fieldset[disabled] .btn-dark.active {
 .vars-content {
     margin-top: 160px;
 }
+
+.bg-vdark {
+  background-color: #000000;
+}
