@@ -101,7 +101,7 @@ func (e Err) Error() string {
 
 // IsNameNotAvailableError returns true if the error is caused by name not being available
 func (e Err) IsNameNotAvailableError() bool {
-	if e.err == ErrNameNotAvailable {
+	if e.err.Error() == ErrNameNotAvailable.Error() {
 		return true
 	}
 	return false

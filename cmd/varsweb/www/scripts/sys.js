@@ -349,6 +349,9 @@ $(document).ready(function() {
 				$("tr[data-sid='"+sid+"']").find("td:eq(0)").text(name);
 			},
             error: function() {
+                if (err == 'Not Acceptable') {
+                    $('#sys-modal-alert-danger-item').text('That name is already taken');
+                }
                 $('#sys-modal-alert-danger').show();
                 $('#sys-modal').scrollTop(0);
             }
@@ -465,8 +468,11 @@ $(document).ready(function() {
                 $('#sys-modal').modal('hide');
 			},
             error: function(j, s, err) {
-                $('#vuln-modal-alert-danger').show();
-                $('#vuln-modal').scrollTop(0);
+                if (err == 'Not Acceptable') {
+                    $('#sys-modal-alert-danger-item').text('That name is already taken');
+                }
+                $('#sys-modal-alert-danger').show();
+                $('#sys-modal').scrollTop(0);
             }
 		});
 	});

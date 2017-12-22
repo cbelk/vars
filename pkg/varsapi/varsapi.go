@@ -221,7 +221,7 @@ func AddSystem(db *sql.DB, sys *vars.System) error {
 		return err
 	}
 	if !a {
-		return vars.ErrNameNotAvailable
+		return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "AddSystem")
 	}
 
 	// Add system
@@ -1484,7 +1484,7 @@ func UpdateVulnerability(db *sql.DB, vuln *vars.Vulnerability) error {
 			return err
 		}
 		if !a {
-			return vars.ErrNameNotAvailable
+			return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "UpdateVulnerability")
 		}
 
 		// Update name
@@ -1812,7 +1812,7 @@ func UpdateSystem(db *sql.DB, sys *vars.System) error {
 			return err
 		}
 		if !a {
-			return vars.ErrNameNotAvailable
+			return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "UpdateSystem")
 		}
 
 		// Update name
@@ -1922,7 +1922,7 @@ func UpdateSystemName(db *sql.DB, sid int64, name string) error {
 		return err
 	}
 	if !a {
-		return vars.ErrNameNotAvailable
+		return vars.NewErr(vars.NameNotAvailable, "VARS", "varsapi", "UpdateSystemName")
 	}
 
 	// Start transaction and set rollback function
