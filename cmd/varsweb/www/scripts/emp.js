@@ -88,21 +88,18 @@ function setupHover() {
             $('.eme-btn-title-submit').hide();
         }
     );
-
     $('#emp-modal-section-email').hover(function() {
             $('.eme-btn-email').show();
         }, function() {
             $('.eme-btn-email').hide();
         }
     );
-
     $('#emp-modal-section-uname').hover(function() {
             $('.eme-btn-uname').show();
         }, function() {
             $('.eme-btn-uname').hide();
         }
     );
-
     $('#emp-modal-section-level').hover(function() {
             $('.eme-btn-level').show();
         }, function() {

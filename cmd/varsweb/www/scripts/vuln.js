@@ -295,7 +295,7 @@ function handleModalAddItem(btnID) {
                     $.ajax({
                         method   : 'GET',
                         dataType : 'json',
-                        url      : '/systems/active',
+                        url      : '/system/active',
                         success: function(data) {
                             $('#vme-add-affected-list').append('<option selected>Select a system</option>');
                             for (i=0; i < data.length; i++) {
