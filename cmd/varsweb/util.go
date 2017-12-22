@@ -41,6 +41,7 @@ type Config struct {
 
 var (
 	authenticate func(string, string) (bool, error)
+	reports      map[string]*plugin.Plugin
 	webConf      Config
 	templates    *template.Template
 )
@@ -50,7 +51,7 @@ func LoadAuth() {
 	if webConf.AuthPlug == "" {
 		log.Fatal("VarsWeb: LoadAuth: No authentication plugin set in the varsweb config file")
 	}
-	plugPath := fmt.Sprintf("%s%s.so", webConf.PlugDir, webConf.AuthPlug)
+	plugPath := fmt.Sprintf("%s/auth/%s.so", webConf.PlugDir, webConf.AuthPlug)
 	plug, err := plugin.Open(plugPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf("VarsWeb: LoadAuth: Unable to load the authentication plugin at %s. \nThe following error was thrown: %v", plugPath, err))
@@ -64,6 +65,34 @@ func LoadAuth() {
 		log.Fatal(fmt.Sprintf("VarsWeb: LoadAuth: The following error occured when performing a type assertion: %v", err))
 	}
 	authenticate = auth
+}
+
+// LoadReports loads the report plugins.
+func LoadReports() {
+	reports = make(map[string]*plugin.Plugin)
+	rdir := fmt.Sprintf("%s/report", webConf.PlugDir)
+	plugs, err := ioutil.ReadDir(rdir)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when retrieving the report plugins: %v", err))
+	}
+	for _, plug := range plugs {
+		pname := plug.Name()
+		if strings.HasSuffix(pname, ".so") {
+			p, err := plugin.Open(fmt.Sprintf("%s/%s", rdir, pname))
+			if err != nil {
+				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: Unable to load the plugin at %s/%s. \nThe following error was thrown: %v", rdir, pname, err))
+			}
+			rname, err := p.Lookup("Name")
+			if err != nil {
+				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when looking up the name for plugin %s/%s: %v", rdir, pname, err))
+			}
+			rn, ok := rname.(*string)
+			if !ok {
+				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when performing a type assertion on name for plugin %s/%s: %v", rdir, pname, err))
+			}
+			reports[*rn] = p
+		}
+	}
 }
 
 // LoadTemplates loads the html template files.

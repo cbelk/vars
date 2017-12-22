@@ -65,6 +65,9 @@ func main() {
 	//authenticate = LoadAuth()
 	LoadAuth()
 
+	// Load the reports
+	LoadReports()
+
 	// Load templates
 	LoadTemplates()
 
@@ -95,6 +98,8 @@ func main() {
 	router.POST("/employee/:emp/:field", handleEmployeePost)
 	router.GET("/notes/:vuln", handleNotes)
 	router.POST("/notes/:noteid", handleNotesPost)
+	router.GET("/report", handleReportPage)
+	router.GET("/report/:report", handleReport)
 	router.PUT("/system", handleSystemAdd)
 	router.GET("/system", handleSystemPage)
 	router.GET("/system/:sys", handleSystems)
@@ -686,6 +691,77 @@ func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 			if err != nil {
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 			}
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+// handleReportPage serves the system page outline
+func handleReportPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		s := struct {
+			Page string
+			User interface{}
+		}{"report", user}
+		w.Header().Add("Content-Type", "text/html")
+		err := templates.Lookup("report").Execute(w, s)
+		if err != nil {
+			http.Error(w, "Error with templating", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	user, err := getSession(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if user.Authed {
+		name := ps.ByName("report")
+		switch name {
+		case "list":
+			var data []string
+			for name, _ := range reports {
+				data = append(data, name)
+			}
+			err = json.NewEncoder(w).Encode(data)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		default:
+			_, ok := reports[name]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			gen, err := reports[name].Lookup("GenerateReport")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			g, ok := gen.(func() (string, error))
+			if !ok {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			rep, err := g()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Add("Content-Type", "text/html")
+			w.Write([]byte(rep))
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)

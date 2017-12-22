@@ -18,49 +18,35 @@
 //                                                                                  //
 //////////////////////////////////////////////////////////////////////////////////////
 
-{% raw %}
-
-// navbar template
-{{define "navbar"}}
-<nav class="navbar navbar-expand-lg fixed-top navbar-dark bg-dark">
-    <div class="container-fluid d-flex flex-row justify-content-between">
-        <a class="navbar-brand" href="/">
-            <img alt="Vulnerability Assessment Reference System" src="/images/logo.png">
-        </a>
-        {{if .Authed}}
-        <ul class="navbar-nav mr-auto">
-            {{if le .Emp.Level 2}}
-            <li class="nav-item">
-                <a class="nav-link" href="/vulnerability">Vulnerability</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/system">System</a>
-            </li>
-            {{end}}
-            {{if eq .Emp.Level 0}}
-            <li class="nav-item">
-                <a class="nav-link" href="/employee">Employee</a>
-            </li>
-            {{end}}
-            <li class="nav-item">
-                <a class="nav-link" href="/report">Reports</a>
-            </li>
-        </ul>
-        <form><button type="submit" class="btn btn-danger navbar-right" formaction="/logout">Logout</button></form>
-        {{end}}
-    </div>
-</nav>
-{{end}}
-
-// navbar template
-{{define "navbar-light"}}
-<nav class="navbar navbar-expand-lg fixed-top navbar-dark bg-dark">
-    <div class="container-fluid d-flex flex-row justify-content-between">
-        <a class="navbar-brand" href="/">
-            <img alt="Vulnerability Assessment Reference System" src="/images/logo.png">
-        </a>
-    </div>
-</nav>
-{{end}}
-
-{% endraw %}
+$(document).ready(function() {
+	$('#report-list').change(function() {
+		var report = $(this).val();
+        if (report != "") {
+            $.ajax({
+                method  : 'GET',
+                dataType: 'html',
+                url     : '/report/'+report,
+                success: function(data) {
+                    $('#report-container').empty();
+                    $('#report-container').html(data);
+                },
+                error: function() {
+                    alert('Error loading report');
+                }
+            });
+        }
+	});
+    $.ajax({
+        method  : 'GET',
+        dataType: 'json',
+        url     : '/report/list',
+        success: function(data) {
+            for(i=0; i<data.length; i++) {
+                $('#report-list').append('<option value="'+data[i]+'">'+data[i]+'</option>');
+            }
+        },
+        error: function() {
+            alert('Error loading report list');
+        }
+    });
+});

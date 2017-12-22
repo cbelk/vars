@@ -986,6 +986,11 @@ func GetVulnerabilityByName(name string) (*vars.Vulnerability, error) {
 	return GetVulnerability(id)
 }
 
+// IsNilErr returns true if the error is nil, false otherwise.
+func IsNilErr(err error) bool {
+	return vars.IsNilErr(err)
+}
+
 // IsNameNotAvailableError returns true if the error is caused by name not being available
 func IsNameNotAvailableError(err error) bool {
 	return vars.IsNameNotAvailableError(err)

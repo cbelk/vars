@@ -8,4 +8,7 @@ $(document).ready(function() {
     $('#vars-index-emp-card').on('click', function() {
         window.location.href = '/employee';
     });
+    $('#vars-index-rep-card').on('click', function() {
+        window.location.href = '/report';
+    });
 });
