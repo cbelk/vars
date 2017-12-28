@@ -80,7 +80,7 @@ func main() {
 
 	// Create Session Manager
 	sessionManager = scs.NewCookieManager(webConf.Skey)
-	//sessionManager.Secure(true)
+	sessionManager.Secure(true)
 
 	// Set paths
 	router := httprouter.New()
