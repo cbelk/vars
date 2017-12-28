@@ -25,8 +25,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"net/http/httputil"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,6 +57,12 @@ type User struct {
 }
 
 func main() {
+	// Setup logging
+	SetupLogging()
+
+	// Compile the regexp used to obfuscate session cookie in logging
+	setupRegex()
+
 	// Read in the configurations
 	ReadVarsConfig()
 	ReadWebConfig()
@@ -74,7 +80,7 @@ func main() {
 	var err error
 	db, err = vars.ConnectDB(&Conf)
 	if err != nil {
-		log.Fatal(err)
+		logError.Fatal(err)
 	}
 	defer vars.CloseDB(db)
 
@@ -118,14 +124,17 @@ func main() {
 	router.ServeFiles("/scripts/*filepath", http.Dir(fmt.Sprintf("%s/scripts", webConf.WebRoot)))
 	router.ServeFiles("/images/*filepath", http.Dir(fmt.Sprintf("%s/images", webConf.WebRoot)))
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
+	logError.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
 }
 
 // handleIndex serves the main page.
 func handleIndex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	if user.Authed {
 		s := struct {
@@ -135,8 +144,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		w.Header().Add("Content-Type", "text/html")
 		err := templates.Lookup("index").Execute(w, s)
 		if err != nil {
-			fmt.Println(err)
+			logError.Printf("Error with templating while performing lookup on %s\n", "index")
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
+			return
 		}
 	} else {
 		http.Redirect(w, r, "/login", http.StatusFound)
@@ -147,7 +157,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	if user.Authed {
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -155,7 +167,9 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		w.Header().Add("Content-Type", "text/html")
 		err := templates.Lookup("login").Execute(w, "login")
 		if err != nil {
+			logError.Printf("Error with templating while performing lookup on %s\n", "login")
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
+			return
 		}
 	}
 }
@@ -167,46 +181,62 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 	p := r.FormValue("password")
 	authed, err := authenticate(u, p)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	user.Authed = authed
 	session := sessionManager.Load(r)
 	if user.Authed {
 		if u == "VARSremoved" {
+			logInfo.Printf("Unauthorized attempt to log in. Username: %s | Client IP/Port: %s\n", u, r.RemoteAddr)
 			w.Header().Add("Content-Type", "text/html")
 			err := templates.Lookup("notauthorized-removed").Execute(w, nil)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-removed")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 			return
 		}
 		emp, err := varsapi.GetEmployeeByUsername(u)
 		if err != nil {
 			if varsapi.IsNoRowsError(err) {
+				logInfo.Printf("Unauthorized attempt to log in. Username: %s | Client IP/Port: %s\n", u, r.RemoteAddr)
 				w.Header().Add("Content-Type", "text/html")
 				err := templates.Lookup("notauthorized-removed").Execute(w, "")
 				if err != nil {
+					logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-removed")
 					http.Error(w, "Error with templating", http.StatusInternalServerError)
+					return
 				}
 				return
 			}
+			logError.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		user.Emp = emp
 		err = session.PutObject(w, "user", user)
 		if err != nil {
+			logError.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		http.Redirect(w, r, "/", http.StatusFound)
 	} else {
+		logInfo.Printf("Failed attempt to log in. Username: %s | Client IP/Port: %s\n", u, r.RemoteAddr)
 		err = session.PutObject(w, "user", user)
 		if err != nil {
+			logError.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		err := templates.Lookup("login-failed").Execute(w, "login")
 		if err != nil {
+			logError.Printf("Error with templating while performing lookup on %s\n", "login-failed")
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
+			return
 		}
 	}
 }
@@ -216,15 +246,19 @@ func handleLogout(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	session := sessionManager.Load(r)
 	err := session.Destroy(w)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 // handleEmployeePage serves the employee page outline
 func handleEmployeePage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -237,12 +271,14 @@ func handleEmployeePage(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 			w.Header().Add("Content-Type", "text/html")
 			err := templates.Lookup("emps").Execute(w, s)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "emps")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -254,9 +290,12 @@ func handleEmployeePage(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 
 // handleEmployees serves the employee objects
 func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	e := ps.ByName("emp")
 	if user.Authed {
@@ -265,7 +304,9 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 			case "all":
 				emps, err := varsapi.GetEmployees()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, emp := range emps {
@@ -281,13 +322,16 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "active":
 				emps, err := varsapi.GetEmployees()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, emp := range emps {
@@ -305,13 +349,16 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "removed":
 				emps, err := varsapi.GetEmployees()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, emp := range emps {
@@ -329,12 +376,14 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "list":
 				emps, err := varsapi.GetEmployees()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -349,6 +398,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -361,6 +411,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				emp, err := varsapi.GetEmployeeByID(int64(eid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -370,6 +421,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}{name}
 				err = json.NewEncoder(w).Encode(s)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -381,11 +433,13 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				emp, err := varsapi.GetEmployeeByID(int64(eid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				err = json.NewEncoder(w).Encode(emp)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -400,6 +454,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}
 				emp, err := varsapi.GetEmployeeByID(int64(eid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -409,6 +464,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				}{name}
 				err = json.NewEncoder(w).Encode(s)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -416,6 +472,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 				if user.Emp.Level == PrivilegedUser {
 					emps, err := varsapi.GetEmployees()
 					if err != nil {
+						logError.Println(err)
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
@@ -430,6 +487,7 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 					}
 					err = json.NewEncoder(w).Encode(data)
 					if err != nil {
+						logError.Println(err)
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
@@ -444,7 +502,9 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 		}
 	} else {
@@ -454,8 +514,10 @@ func handleEmployees(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 // handleEmployeeAdd adds the new employee to VARS
 func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -468,11 +530,14 @@ func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 			l := r.FormValue("level")
 			level, err := strconv.Atoi(l)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			emp := varsapi.CreateEmployee(fname, lname, email, uname, level)
 			err = varsapi.AddEmployee(db, emp)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -481,12 +546,14 @@ func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 			}{emp.ID}
 			err = json.NewEncoder(w).Encode(ist)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -497,19 +564,25 @@ func handleEmployeeAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 }
 
 func handleEmployeeDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	e := ps.ByName("emp")
 	eid, err := strconv.Atoi(e)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	if user.Authed {
 		if user.Emp.Level == AdminUser {
 			err = varsapi.DeleteEmployee(db, int64(eid))
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -520,14 +593,19 @@ func handleEmployeeDelete(w http.ResponseWriter, r *http.Request, ps httprouter.
 }
 
 func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	e := ps.ByName("emp")
 	eid, err := strconv.Atoi(e)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -538,6 +616,7 @@ func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				lname := r.FormValue("lastname")
 				err := varsapi.UpdateEmployeeName(db, int64(eid), fname, lname)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -551,6 +630,7 @@ func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				email := r.FormValue("email")
 				err := varsapi.UpdateEmployeeEmail(db, int64(eid), email)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -564,6 +644,7 @@ func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				username := r.FormValue("username")
 				err := varsapi.UpdateEmployeeUsername(db, int64(eid), username)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -577,10 +658,13 @@ func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				l := r.FormValue("level")
 				level, err := strconv.Atoi(l)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = varsapi.UpdateEmployeeLevel(db, int64(eid), level)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -597,9 +681,12 @@ func handleEmployeePost(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	if user.Authed {
 		if user.Emp.Level <= StandardUser {
@@ -615,6 +702,7 @@ func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 					w.WriteHeader(http.StatusOK)
 					return
 				}
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -623,7 +711,9 @@ func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 				canEdit := user.Emp.ID == n.EmpID
 				employee, err := varsapi.GetEmployeeByID(n.EmpID)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				note := struct {
 					Nid      int64
@@ -636,13 +726,16 @@ func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 			}
 			err = json.NewEncoder(w).Encode(notes)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 		}
 	} else {
@@ -651,9 +744,12 @@ func handleNotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	if user.Authed {
 		n := ps.ByName("noteid")
@@ -664,6 +760,7 @@ func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		}
 		author, err := varsapi.GetNoteAuthor(int64(nid))
 		if err != nil {
+			logError.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -671,14 +768,18 @@ func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 			note := r.FormValue("note")
 			err = varsapi.UpdateNote(db, int64(nid), note)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
+				return
 			} else {
 				w.WriteHeader(http.StatusOK)
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 		}
 	} else {
@@ -688,8 +789,10 @@ func handleNotesPost(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 // handleReportPage serves the system page outline
 func handleReportPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -701,6 +804,7 @@ func handleReportPage(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		w.Header().Add("Content-Type", "text/html")
 		err := templates.Lookup("report").Execute(w, s)
 		if err != nil {
+			logError.Printf("Error with templating while performing lookup on %s\n", "report")
 			http.Error(w, "Error with templating", http.StatusInternalServerError)
 			return
 		}
@@ -710,8 +814,10 @@ func handleReportPage(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 }
 
 func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -725,6 +831,7 @@ func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 			}
 			err = json.NewEncoder(w).Encode(data)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -736,6 +843,7 @@ func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 			}
 			gen, err := reports[name].Lookup("GenerateReport")
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -746,6 +854,7 @@ func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 			}
 			rep, err := g()
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -759,8 +868,10 @@ func handleReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 
 // handleSystemAdd adds the new system to VARS
 func handleSystemAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -778,6 +889,7 @@ func handleSystemAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 					w.WriteHeader(http.StatusNotAcceptable)
 					return
 				}
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -786,12 +898,14 @@ func handleSystemAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 			}{sys.ID}
 			err = json.NewEncoder(w).Encode(ist)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -803,8 +917,10 @@ func handleSystemAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 
 // handleSystemPage serves the system page outline
 func handleSystemPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -817,12 +933,14 @@ func handleSystemPage(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 			w.Header().Add("Content-Type", "text/html")
 			err := templates.Lookup("sys").Execute(w, s)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "sys")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -833,6 +951,7 @@ func handleSystemPage(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 }
 
 func handleSystemDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -841,6 +960,7 @@ func handleSystemDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	s := ps.ByName("sys")
 	sid, err := strconv.Atoi(s)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -848,6 +968,7 @@ func handleSystemDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		if user.Emp.Level <= PrivilegedUser {
 			err = varsapi.DeleteSystem(db, int64(sid))
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -862,9 +983,12 @@ func handleSystemDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	s := ps.ByName("sys")
 	if user.Authed {
@@ -873,20 +997,26 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 			case "all":
 				syss, err := varsapi.GetSystems()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = json.NewEncoder(w).Encode(syss)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "active", "inactive":
 				syss, err := varsapi.GetSystemsByState(s)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = json.NewEncoder(w).Encode(syss)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -898,11 +1028,13 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 				}
 				sys, err := varsapi.GetSystem(int64(sid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				err = json.NewEncoder(w).Encode(sys)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -910,7 +1042,9 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 		}
 	} else {
@@ -919,14 +1053,19 @@ func handleSystems(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 }
 
 func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	s := ps.ByName("sys")
 	sid, err := strconv.Atoi(s)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -940,6 +1079,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 						w.WriteHeader(http.StatusNotAcceptable)
 						return
 					}
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -953,6 +1093,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				tp := r.FormValue("type")
 				err := varsapi.UpdateSystemType(db, int64(sid), tp)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -966,6 +1107,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				opsys := r.FormValue("os")
 				err := varsapi.UpdateSystemOS(db, int64(sid), opsys)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -979,6 +1121,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				loc := r.FormValue("location")
 				err := varsapi.UpdateSystemLocation(db, int64(sid), loc)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -992,6 +1135,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				desc := r.FormValue("description")
 				err := varsapi.UpdateSystemDescription(db, int64(sid), desc)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1009,6 +1153,7 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				}
 				err := varsapi.UpdateSystemState(db, int64(sid), state)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1026,8 +1171,10 @@ func handleSystemPost(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 // handleVulnerabilityAdd adds the new vuln to VARS
 func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -1045,22 +1192,26 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 			expl := r.FormValue("exploit")
 			exploitable, err := strconv.ParseBool(expb)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			cScore, err := strconv.ParseFloat(cvss, 32)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			corpscore, err := strconv.ParseFloat(corp, 32)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			vuln := varsapi.CreateVulnerability(name, summ, cvsl, test, miti, expl, exploitable, float32(cScore), float32(corpscore))
 			finder, err := strconv.Atoi(find)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -1072,6 +1223,7 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 					w.WriteHeader(http.StatusNotAcceptable)
 					return
 				}
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -1080,12 +1232,14 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 			}{vuln.ID}
 			err = json.NewEncoder(w).Encode(ist)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -1096,14 +1250,19 @@ func handleVulnerabilityAdd(w http.ResponseWriter, r *http.Request, _ httprouter
 }
 
 func handleVulnerabilityField(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	v := ps.ByName("vuln")
 	vid, err := strconv.Atoi(v)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -1113,6 +1272,7 @@ func handleVulnerabilityField(w http.ResponseWriter, r *http.Request, ps httprou
 			cves, err := varsapi.GetCves(int64(vid))
 			if err != nil {
 				if !varsapi.IsNoRowsError(err) {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1124,6 +1284,7 @@ func handleVulnerabilityField(w http.ResponseWriter, r *http.Request, ps httprou
 			}{cve}
 			err = json.NewEncoder(w).Encode(s)
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -1138,8 +1299,10 @@ func handleVulnerabilityField(w http.ResponseWriter, r *http.Request, ps httprou
 
 // handleVulnerabilityPage serves the vulnerability page outline
 func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -1152,12 +1315,14 @@ func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httproute
 			w.Header().Add("Content-Type", "text/html")
 			err := templates.Lookup("vulns").Execute(w, s)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "vulns")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
 				return
 			}
@@ -1169,9 +1334,12 @@ func handleVulnerabilityPage(w http.ResponseWriter, r *http.Request, _ httproute
 
 // handleVulnerabilities serves the vulnerability objects
 func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	v := ps.ByName("vuln")
 	if user.Authed {
@@ -1180,7 +1348,9 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 			case "all":
 				vulns, err := varsapi.GetVulnerabilities()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, v := range vulns {
@@ -1188,6 +1358,7 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 					cves, err := varsapi.GetCves(v.ID)
 					if err != nil {
 						if !varsapi.IsNoRowsError(err) {
+							logError.Println(err)
 							w.WriteHeader(http.StatusInternalServerError)
 							return
 						}
@@ -1212,13 +1383,16 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "open":
 				vulns, err := varsapi.GetOpenVulnerabilities()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, v := range vulns {
@@ -1226,6 +1400,7 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 					cves, err := varsapi.GetCves(v.ID)
 					if err != nil {
 						if !varsapi.IsNoRowsError(err) {
+							logError.Println(err)
 							w.WriteHeader(http.StatusInternalServerError)
 							return
 						}
@@ -1245,13 +1420,16 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 			case "closed":
 				vulns, err := varsapi.GetClosedVulnerabilities()
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				var data []interface{}
 				for _, v := range vulns {
@@ -1259,6 +1437,7 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 					cves, err := varsapi.GetCves(v.ID)
 					if err != nil {
 						if !varsapi.IsNoRowsError(err) {
+							logError.Println(err)
 							w.WriteHeader(http.StatusInternalServerError)
 							return
 						}
@@ -1285,6 +1464,7 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				err = json.NewEncoder(w).Encode(data)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1296,11 +1476,13 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				vuln, err := varsapi.GetVulnerability(int64(vid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				err = json.NewEncoder(w).Encode(vuln)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1308,7 +1490,9 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 		} else {
 			err := templates.Lookup("notauthorized-get").Execute(w, user)
 			if err != nil {
+				logError.Printf("Error with templating while performing lookup on %s\n", "notauthorized-get")
 				http.Error(w, "Error with templating", http.StatusInternalServerError)
+				return
 			}
 		}
 	} else {
@@ -1317,14 +1501,19 @@ func handleVulnerabilities(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	v := ps.ByName("vuln")
 	vid, err := strconv.Atoi(v)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -1334,6 +1523,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				cve := r.FormValue("cve")
 				err := varsapi.AddCve(db, int64(vid), cve)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1346,6 +1536,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				ticket := r.FormValue("ticket")
 				err := varsapi.AddTicket(db, int64(vid), ticket)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1358,6 +1549,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				ref := r.FormValue("ref")
 				err := varsapi.AddRef(db, int64(vid), ref)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1370,11 +1562,13 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				sys := r.FormValue("system")
 				sid, err := strconv.Atoi(sys)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				err = varsapi.AddAffected(db, int64(vid), int64(sid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1387,6 +1581,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 				note := r.FormValue("note")
 				err := varsapi.AddNote(db, int64(vid), user.Emp.ID, note)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1398,6 +1593,7 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 			if user.Emp.Level <= PrivilegedUser {
 				err := varsapi.CloseVulnerability(db, int64(vid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1415,14 +1611,19 @@ func handleVulnerabilityPut(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	v := ps.ByName("vuln")
 	vid, err := strconv.Atoi(v)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -1432,7 +1633,9 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 				cve := ps.ByName("item")
 				err := varsapi.DeleteCve(db, int64(vid), cve)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1444,7 +1647,9 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 				ticket := ps.ByName("item")
 				err := varsapi.DeleteTicket(db, int64(vid), ticket)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1455,12 +1660,14 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			if user.Emp.Level <= StandardUser {
 				b, err := ioutil.ReadAll(r.Body)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				ref := string(b)
 				err = varsapi.DeleteRef(db, int64(vid), ref)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1473,12 +1680,15 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 				sys := ps.ByName("item")
 				sid, err := strconv.Atoi(sys)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				err = varsapi.DeleteAffected(db, int64(vid), int64(sid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1494,12 +1704,14 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			}
 			author, err := varsapi.GetNoteAuthor(int64(nid))
 			if err != nil {
+				logError.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			if user.Emp.Level <= StandardUser && user.Emp.ID == author {
 				err = varsapi.DeleteNote(db, int64(nid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1511,7 +1723,9 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			if user.Emp.Level <= PrivilegedUser {
 				err := varsapi.ReopenVulnerability(db, int64(vid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1522,7 +1736,9 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 			if user.Emp.Level <= PrivilegedUser {
 				err := varsapi.DeleteVulnerability(db, int64(vid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1539,14 +1755,19 @@ func handleVulnerabilityDelete(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	logRequest(r)
 	user, err := getSession(r)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	v := ps.ByName("vuln")
 	vid, err := strconv.Atoi(v)
 	if err != nil {
+		logError.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	field := ps.ByName("field")
 	if user.Authed {
@@ -1560,6 +1781,7 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 						w.WriteHeader(http.StatusNotAcceptable)
 						return
 					}
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1573,7 +1795,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				summ := r.FormValue("summary")
 				err := varsapi.UpdateVulnerabilitySummary(db, int64(vid), summ)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1586,7 +1810,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				cve := r.FormValue("cve")
 				err := varsapi.UpdateCve(db, int64(vid), oldcve, cve)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1599,11 +1825,15 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				cvssLink := r.FormValue("cvssLink")
 				cScore, err := strconv.ParseFloat(cvssScore, 32)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					err := varsapi.UpdateCvss(db, int64(vid), float32(cScore), cvssLink)
 					if err != nil {
+						logError.Println(err)
 						w.WriteHeader(http.StatusInternalServerError)
+						return
 					} else {
 						w.WriteHeader(http.StatusOK)
 					}
@@ -1616,11 +1846,15 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				corpscore := r.FormValue("corpscore")
 				cScore, err := strconv.ParseFloat(corpscore, 32)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					err := varsapi.UpdateCorpScore(db, int64(vid), float32(cScore))
 					if err != nil {
+						logError.Println(err)
 						w.WriteHeader(http.StatusInternalServerError)
+						return
 					} else {
 						w.WriteHeader(http.StatusOK)
 					}
@@ -1633,10 +1867,13 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				finder := r.FormValue("finder")
 				eid, err := strconv.Atoi(finder)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = varsapi.UpdateFinder(db, int64(vid), int64(eid))
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -1650,7 +1887,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				test := r.FormValue("test")
 				err := varsapi.UpdateVulnerabilityTest(db, int64(vid), test)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1662,7 +1901,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				mitigation := r.FormValue("mitigation")
 				err := varsapi.UpdateVulnerabilityMitigation(db, int64(vid), mitigation)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1675,7 +1916,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				ticket := r.FormValue("ticket")
 				err := varsapi.UpdateTicket(db, int64(vid), oldticket, ticket)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1688,7 +1931,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				newRef := r.FormValue("newr")
 				err := varsapi.UpdateReference(db, int64(vid), oldRef, newRef)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1700,11 +1945,15 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				exploitable := r.FormValue("exploitable")
 				b, err := strconv.ParseBool(exploitable)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = varsapi.UpdateExploitable(db, int64(vid), b)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1716,7 +1965,9 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				exploit := r.FormValue("exploit")
 				err = varsapi.UpdateExploit(db, int64(vid), exploit)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1728,17 +1979,22 @@ func handleVulnerabilityPost(w http.ResponseWriter, r *http.Request, ps httprout
 				sys := ps.ByName("item")
 				sid, err := strconv.Atoi(sys)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				patched := r.FormValue("patched")
 				b, err := strconv.ParseBool(patched)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				err = varsapi.UpdateAffected(db, int64(vid), int64(sid), b)
 				if err != nil {
+					logError.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					w.WriteHeader(http.StatusOK)
 				}
@@ -1761,4 +2017,15 @@ func getSession(r *http.Request) (*User, error) {
 		return &user, err
 	}
 	return &user, nil
+}
+
+// logRequest logs the incoming http request including client IP and port.
+func logRequest(r *http.Request) {
+	reqDump, err := httputil.DumpRequest(r, true)
+	if err != nil {
+		logError.Printf("Error dumping request: %v\n", err)
+	}
+	req := fmt.Sprintf("Client IP/Port: %s | Request: %s", r.RemoteAddr, string(reqDump))
+	req = strings.Replace(req, "\r\n", " | ", -1)
+	logInfo.Println(cookRegex.ReplaceAllString(req, "session=****"))
 }

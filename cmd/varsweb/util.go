@@ -28,6 +28,7 @@ import (
 	"log"
 	"os"
 	"plugin"
+	"regexp"
 	"strings"
 )
 
@@ -44,25 +45,28 @@ var (
 	reports      map[string]*plugin.Plugin
 	webConf      Config
 	templates    *template.Template
+	logError     *log.Logger
+	logInfo      *log.Logger
+	cookRegex    *regexp.Regexp
 )
 
 // LoadAuth loads the auth plugin and returns the Authenticate function.
 func LoadAuth() {
 	if webConf.AuthPlug == "" {
-		log.Fatal("VarsWeb: LoadAuth: No authentication plugin set in the varsweb config file")
+		logError.Fatal("VarsWeb: LoadAuth: No authentication plugin set in the varsweb config file")
 	}
 	plugPath := fmt.Sprintf("%s/auth/%s.so", webConf.PlugDir, webConf.AuthPlug)
 	plug, err := plugin.Open(plugPath)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadAuth: Unable to load the authentication plugin at %s. \nThe following error was thrown: %v", plugPath, err))
+		logError.Fatalf("VarsWeb: LoadAuth: Unable to load the authentication plugin at %s. \nThe following error was thrown: %v", plugPath, err)
 	}
 	symAuth, err := plug.Lookup("Authenticate")
 	if err != nil {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadAuth: The following error occured when performing lookup on plugin: %v", err))
+		logError.Fatalf("VarsWeb: LoadAuth: The following error occured when performing lookup on plugin: %v", err)
 	}
 	auth, ok := symAuth.(func(string, string) (bool, error))
 	if !ok {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadAuth: The following error occured when performing a type assertion: %v", err))
+		logError.Fatalf("VarsWeb: LoadAuth: The following error occured when performing a type assertion: %v", err)
 	}
 	authenticate = auth
 }
@@ -73,22 +77,22 @@ func LoadReports() {
 	rdir := fmt.Sprintf("%s/report", webConf.PlugDir)
 	plugs, err := ioutil.ReadDir(rdir)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when retrieving the report plugins: %v", err))
+		logError.Fatalf("VarsWeb: LoadReports: The following error occured when retrieving the report plugins: %v", err)
 	}
 	for _, plug := range plugs {
 		pname := plug.Name()
 		if strings.HasSuffix(pname, ".so") {
 			p, err := plugin.Open(fmt.Sprintf("%s/%s", rdir, pname))
 			if err != nil {
-				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: Unable to load the plugin at %s/%s. \nThe following error was thrown: %v", rdir, pname, err))
+				logError.Fatalf("VarsWeb: LoadReports: Unable to load the plugin at %s/%s. \nThe following error was thrown: %v", rdir, pname, err)
 			}
 			rname, err := p.Lookup("Name")
 			if err != nil {
-				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when looking up the name for plugin %s/%s: %v", rdir, pname, err))
+				logError.Fatalf("VarsWeb: LoadReports: The following error occured when looking up the name for plugin %s/%s: %v", rdir, pname, err)
 			}
 			rn, ok := rname.(*string)
 			if !ok {
-				log.Fatal(fmt.Sprintf("VarsWeb: LoadReports: The following error occured when performing a type assertion on name for plugin %s/%s: %v", rdir, pname, err))
+				logError.Fatalf("VarsWeb: LoadReports: The following error occured when performing a type assertion on name for plugin %s/%s: %v", rdir, pname, err)
 			}
 			reports[*rn] = p
 		}
@@ -101,7 +105,7 @@ func LoadTemplates() {
 	tdir := fmt.Sprintf("%s/templates", webConf.WebRoot)
 	files, err := ioutil.ReadDir(tdir)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadTemplates: The following error occured when retrieving the template files: %v", err))
+		logError.Fatalf("VarsWeb: LoadTemplates: The following error occured when retrieving the template files: %v", err)
 	}
 	for _, file := range files {
 		fname := file.Name()
@@ -111,7 +115,7 @@ func LoadTemplates() {
 	}
 	templates, err = template.ParseFiles(tfiles...)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("VarsWeb: LoadTemplates: The following error occured when parsing the template files: %v", err))
+		logError.Fatalf("VarsWeb: LoadTemplates: The following error occured when parsing the template files: %v", err)
 	}
 }
 
@@ -122,17 +126,17 @@ func ReadVarsConfig() {
 	if config == "" {
 		def := "/etc/vars/vars.conf"
 		if _, err := os.Stat(def); os.IsNotExist(err) {
-			log.Fatal("VarsWeb: ReadVarsConfig: Cannot find a configuration file (checked VARS_CONFIG and /etc/vars/vars.conf)")
+			logError.Fatal("VarsWeb: ReadVarsConfig: Cannot find a configuration file (checked VARS_CONFIG and /etc/vars/vars.conf)")
 		}
 		config = def
 	}
 	file, err := os.Open(config)
 	if err != nil {
-		log.Fatal(err)
+		logError.Fatal(err)
 	}
 	err = json.NewDecoder(file).Decode(&Conf)
 	if err != nil {
-		log.Fatal(err)
+		logError.Fatal(err)
 	}
 }
 
@@ -142,16 +146,31 @@ func ReadWebConfig() {
 	if config == "" {
 		def := "/etc/vars/varsweb.conf"
 		if _, err := os.Stat(def); os.IsNotExist(err) {
-			log.Fatal("VarsWeb: ReadWebConfig: Cannot find a configuration file (checked VARS_WEB_CONFIG and /etc/vars/varsweb.conf)")
+			logError.Fatal("VarsWeb: ReadWebConfig: Cannot find a configuration file (checked VARS_WEB_CONFIG and /etc/vars/varsweb.conf)")
 		}
 		config = def
 	}
 	file, err := os.Open(config)
 	if err != nil {
-		log.Fatal(err)
+		logError.Fatal(err)
 	}
 	err = json.NewDecoder(file).Decode(&webConf)
 	if err != nil {
-		log.Fatal(err)
+		logError.Fatal(err)
 	}
+}
+
+// SetupLogging sets up the Loggers for error and info
+func SetupLogging() {
+	logError = log.New(os.Stderr, "Vars-Error: ", log.Ldate|log.Ltime|log.Lshortfile)
+	logInfo = log.New(os.Stdout, "Vars-Info: ", log.Ldate|log.Ltime)
+}
+
+// setupRegex compiles the regexp object used to obfuscate the session cookie
+func setupRegex() {
+	re, err := regexp.Compile(`session=\S*\s`)
+	if err != nil {
+		logError.Fatalf("The following error occured when compiling the regexp: %v", err)
+	}
+	cookRegex = re
 }
