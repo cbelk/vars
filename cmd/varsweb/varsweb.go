@@ -62,7 +62,6 @@ func main() {
 	ReadWebConfig()
 
 	// Load the authentication plugin
-	//authenticate = LoadAuth()
 	LoadAuth()
 
 	// Load the reports
@@ -89,7 +88,6 @@ func main() {
 	router.GET("/login", handleLoginGet)
 	router.POST("/login", handleLoginPost)
 	router.GET("/logout", handleLogout)
-	router.GET("/session", DisplaySession)
 	router.PUT("/employee", handleEmployeeAdd)
 	router.GET("/employee", handleEmployeePage)
 	router.DELETE("/employee/:emp", handleEmployeeDelete)
@@ -121,15 +119,6 @@ func main() {
 	router.ServeFiles("/images/*filepath", http.Dir(fmt.Sprintf("%s/images", webConf.WebRoot)))
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", webConf.Port), router))
-}
-
-// *** used for testing -- REMOVE ***
-func DisplaySession(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	user, err := getSession(r)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	w.Write([]byte(fmt.Sprintf("user object: %v\nis user authed: %v\nemployee object: %v", user, user.Authed, user.Emp)))
 }
 
 // handleIndex serves the main page.
